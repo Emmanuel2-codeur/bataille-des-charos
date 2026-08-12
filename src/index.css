@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { scroll-behavior: smooth; }
+
+body {
+  @apply bg-white text-ink-950 font-body antialiased;
+  background-image: none;
+}
+
+::selection { background: #FF5A1F; color: #ffffff; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #f3f4f6; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #FF5A1F; }
+
+@layer components {
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase text-charo-orange;
+  }
+  .eyebrow::before {
+    content: '';
+    @apply w-2 h-2 rounded-full bg-charo-orange inline-block;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-charo-gradient text-white font-bold px-6 py-3.5 shadow-glow hover:brightness-110 active:scale-[0.98] transition-all;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ink-600 text-ink-950 font-semibold px-6 py-3.5 hover:border-charo-orange hover:text-charo-orange transition-all;
+  }
+  .card {
+    @apply bg-white text-ink-950 border border-ink-700 rounded-2xl shadow-card;
+  }
+  .badge-live {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-live/15 border border-live/40 text-live text-xs font-bold tracking-wider uppercase px-3 py-1;
+  }
+}
+
+
+/* Contraste renforcé sur le thème clair */
+input, select, textarea {
+  color: #111827;
+  background-color: #ffffff;
+}
+input::placeholder, textarea::placeholder {
+  color: #6B7280;
+  opacity: 1;
+}
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Contraste du thème clair : aucun texte important ne doit disparaître sur blanc. */
+body, button, input, select, textarea { color: #111827; }
+table th { color: #111827; }
+table td { color: #1f2937; }
