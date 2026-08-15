@@ -142,6 +142,9 @@ export default function Landing() {
               <Link to="/classement"  className="btn-primary">
                 <PlayCircle size={18}  /> Voir le classement
               </Link>
+               <Link to="/matchs" className="btn-primary">
+                <Swords size={18} strokeWidth={2.5} /> Voir les matches
+              </Link>
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-ink-600 mb-3">Coup d'envoi dans</p>

@@ -10,6 +10,7 @@ import Classement from './pages/Classement'
 import Historique from './pages/Historique'
 import Profil from './pages/Profil'
 import AdminRoute from './components/AdminRoute'
+import Matchs from './pages/Matchs'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/historique" element={<Historique />} />
       <Route path="/connexion" element={<Login />} />
       <Route path="/profil" element={<Profil />} />
+      <Route path="/matchs" element={<Matchs />} />
       <Route
         path="/admin"
         element={
