@@ -62,7 +62,7 @@ export default function Historique() {
           <div className="flex flex-wrap items-end justify-between gap-6 mb-10">
             <div>
               <span className="eyebrow mb-4"><History size={13} /> Archives</span>
-              <h1 className="font-display text-4xl md:text-5xl mb-3 text-ink-900">Historique des matchs</h1>
+              <h1 className="font-display text-4xl md:text-5xl mb-3">Historique des matchs</h1>
               <p className="text-ink-600 max-w-2xl">Tous les matchs terminés, leurs scores, kills et dégâts.</p>
             </div>
             <button onClick={loadHistory} className="btn-primary" disabled={loading}>

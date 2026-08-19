@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, Medal, RefreshCw, Trophy } from 'lucide-react'
+import { Medal, RefreshCw, Trophy } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { PAGE_LINKS } from '../config'
 
 export default function Classement() {
   const [players, setPlayers] = useState([])
@@ -56,19 +54,14 @@ export default function Classement() {
           <div className="flex flex-wrap items-end justify-between gap-6 mb-10">
             <div>
               <span className="eyebrow mb-4"><Trophy size={13} /> Classement général</span>
-              <h1 className="font-display text-4xl md:text-5xl mb-3 text-ink-900">Le classement</h1>
+              <h1 className="font-display text-4xl md:text-5xl mb-3">Le classement</h1>
               <p className="text-ink-600 max-w-2xl">
                 Les scores, dégâts et victoires se mettent à jour automatiquement dès qu'un match de poule est terminé.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link to={PAGE_LINKS.bracket} className="btn-outline">
-                Voir le bracket <ArrowRight size={16} />
-              </Link>
-              <button onClick={loadRanking} className="btn-primary" disabled={loading}>
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
-              </button>
-            </div>
+            <button onClick={loadRanking} className="btn-primary" disabled={loading}>
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
+            </button>
           </div>
 
           <div className="card overflow-hidden">

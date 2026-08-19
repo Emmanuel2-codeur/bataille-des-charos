@@ -8,9 +8,9 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import StatsBar from '../components/StatsBar'
 import CountdownTimer from '../components/CountdownTimer'
+import MatchCard from '../components/MatchCard'
 import logo from '../assets/logo.jpg'
 import { supabase } from '../lib/supabaseClient'
-import { HOME_ACTIONS } from '../config'
 
 const formatCards = [
   {
@@ -83,23 +83,36 @@ const prizeTiers = [
 
 export default function Landing() {
   const [announcements, setAnnouncements] = useState([])
+  const [featuredMatches, setFeaturedMatches] = useState([])
 
   useEffect(() => {
     const load = async () => {
-      const { data: announceRows } = await supabase
-        .from('announcements')
-        .select('id, title, body, category, image_url, created_at')
-        .eq('published', true)
-        .order('created_at', { ascending: false })
-        .limit(3)
+      const [{ data: announceRows }, { data: matchRows }] = await Promise.all([
+        supabase.from('announcements').select('id, title, body, created_at').eq('published', true).order('created_at', { ascending: false }).limit(3),
+        supabase
+          .from('matches')
+          .select('id, phase, round_label, match_type, status, scheduled_at, score1, score2, damage1, damage2, player1:profiles!matches_player1_id_fkey(pseudo), player2:profiles!matches_player2_id_fkey(pseudo)')
+          .eq('is_featured', true)
+          .order('scheduled_at', { ascending: true, nullsFirst: false })
+          .limit(3),
+      ])
 
       setAnnouncements(announceRows || [])
+      setFeaturedMatches((matchRows || []).map((m) => ({
+        player1: m.player1?.pseudo || 'Joueur 1',
+        player2: m.player2?.pseudo || 'Joueur 2',
+        score1: m.score1, score2: m.score2, damage1: m.damage1, damage2: m.damage2,
+        status: m.status, matchType: m.match_type,
+        roundLabel: m.round_label || (m.phase === 'poule' ? 'Poule' : m.phase),
+        scheduledAt: m.scheduled_at ? new Date(m.scheduled_at).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : null,
+      })))
     }
     load()
 
     const channel = supabase
       .channel?.('landing-live')
       ?.on?.('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, load)
+      ?.on?.('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, load)
       ?.subscribe?.()
     return () => { if (channel) supabase.removeChannel?.(channel) }
   }, [])
@@ -120,26 +133,19 @@ export default function Landing() {
             </h1>
             <p className="text-ink-600 text-base md:text-lg max-w-lg mb-8 leading-relaxed">
               La Bataille des Charos réunit les joueurs Free Fire approuvés dans un tournoi solo 1v1 sans pitié :
-              poules, repêchage, bracket à élimination directe. Scores en cours, arbre du tournoi, un seul champion.
+              poules, repêchage, bracket à élimination directe. Score en direct, arbre live, un seul champion.
             </p>
-            <div className="home-actions-grid mb-10">
-              {HOME_ACTIONS.map((action, index) => {
-                const Icon = index === 0 ? Swords : index === 1 ? Trophy : index === 2 ? Swords : Megaphone
-                const variant = action.variant === 'primary' ? 'home-action-primary' : action.variant === 'dark' ? 'home-action-dark' : ''
-                return (
-                  <Link key={action.to} to={action.to} className={`home-action ${variant}`}>
-                    <Icon size={18} strokeWidth={index === 0 || index === 2 ? 2.5 : 2} />
-                    <span>{action.label}</span>
-                  </Link>
-                )
-              })}
+            <div className="flex flex-wrap items-center gap-4 mb-10">
+              <Link to="/connexion" className="btn-primary">
+                <Swords size={18} strokeWidth={2.5} /> Rejoindre le tournoi
+              </Link>
+              <Link to="/classement"  className="btn-primary">
+                <PlayCircle size={18}  /> Voir le classement
+              </Link>
+               <Link to="/matchs" className="btn-primary">
+                <Swords size={18} strokeWidth={2.5} /> Voir les matches
+              </Link>
             </div>
-            <div className="guild-leader">
-              <span>CHEF DE GUILDE</span>
-              <strong>AMEGLADJA</strong>
-              <em>« Méchant Méchant »</em>
-            </div>
-
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-ink-600 mb-3">Coup d'envoi dans</p>
               <CountdownTimer targetDate="2026-08-17T00:00:00" />
@@ -154,7 +160,7 @@ export default function Landing() {
                 alt="Guilde Méchantcharo"
                 className="w-full aspect-square object-cover rounded-xl"
               />
-              <div className="absolute top-6 left-6 badge-open">
+              <div className="absolute top-6 left-6 badge-live">
                 <span className="w-1.5 h-1.5 rounded-full bg-live animate-ping" /> Inscriptions ouvertes
               </div>
             </div>
@@ -213,7 +219,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-5 lg:px-8 grid lg:grid-cols-2 gap-14 items-center">
           <div>
             <span className="eyebrow mb-5">Notre impact</span>
-            <h2 className="font-display text-4xl md:text-5xl leading-tight mb-6 text-ink-800">
+            <h2 className="font-display text-4xl md:text-5xl leading-tight mb-6">
               Une compétition<br /><span className="text-charo-orange">sans précédent.</span>
             </h2>
             <div className="grid grid-cols-2 gap-6 mb-9">
@@ -245,7 +251,7 @@ export default function Landing() {
             <div className="card p-5 flex flex-col justify-between h-44 mt-8">
               <Radio className="text-charo-orange" size={22} />
               <div>
-                <p className="font-display text-2xl text-ink-950">En cours</p>
+                <p className="font-display text-2xl text-ink-950">Live</p>
                 <p className="text-xs text-ink-600">Scores synchronisés en temps réel</p>
               </div>
             </div>
@@ -267,60 +273,61 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ================= ANNONCES DE LA GUILDE ================= */}
-      <section className="py-20 lg:py-24 border-t border-ink-700">
+      {/* ================= MATCHS À LA UNE ================= */}
+      <section className="py-20 lg:py-28 border-t border-ink-700">
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
-          <div className="flex flex-wrap items-end justify-between gap-6 mb-10">
+          <div className="flex flex-wrap items-end justify-between gap-6 mb-12">
             <div>
-              <span className="eyebrow mb-4"><Megaphone size={13} /> Vie de la guilde</span>
-              <h2 className="font-display text-4xl md:text-5xl text-ink-900">Annonces de la guilde</h2>
-              <p className="text-ink-600 mt-3 max-w-xl">Les dernières informations publiées par l'administration de MÉCHANTCHARO.</p>
+              <span className="eyebrow mb-4">Suivi en direct</span>
+              <h2 className="font-display text-4xl md:text-5xl">Matchs à la une</h2>
             </div>
-            <Link to="/annonces" className="btn-primary">
-              Voir plus <ArrowRight size={16} />
+            <Link to="/dashboard" className="btn-primary">
+              Dashboard complet <ArrowRight size={16} />
             </Link>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
-            {announcements.map((a) => (
-              <Link key={a.id} to="/annonces" className="card overflow-hidden group hover:border-charo-orange/50 transition-all">
-                {a.image_url && (
-                  <div className="aspect-[16/8] overflow-hidden bg-ink-800">
-                    <img src={a.image_url} alt="" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" />
-                  </div>
-                )}
-                <div className="p-6">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <span className="category-pill">{a.category || 'Information'}</span>
-                    <span className="text-[11px] text-ink-600">{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
-                  </div>
-                  <h3 className="font-bold text-lg text-ink-950 line-clamp-2">{a.title || 'Annonce de la guilde'}</h3>
-                  <p className="text-sm text-ink-600 leading-relaxed mt-2 line-clamp-3">{a.body}</p>
-                  <span className="inline-flex items-center gap-1.5 mt-5 text-xs font-extrabold uppercase tracking-wide text-charo-orange">Lire l'annonce <ArrowRight size={13} /></span>
-                </div>
-              </Link>
-            ))}
-            {announcements.length === 0 && (
-              <div className="md:col-span-3 rounded-2xl border border-ink-700 bg-ink-800 p-10 text-center">
-                <Megaphone className="mx-auto text-charo-orange mb-3" size={22} />
-                <p className="font-bold">Aucune annonce pour le moment</p>
-                <p className="text-sm text-ink-600 mt-1">Les prochaines informations de la guilde apparaîtront ici.</p>
-              </div>
+            {featuredMatches.map((m, i) => <MatchCard key={i} match={m} />)}
+            {featuredMatches.length === 0 && (
+              <p className="text-ink-600 col-span-full text-center py-12">
+                Aucun match mis en avant pour l'instant — reviens bientôt.
+              </p>
             )}
           </div>
         </div>
       </section>
 
+      {/* ================= ANNONCES ================= */}
+      {announcements.length > 0 && (
+        <section className="py-16 border-t border-ink-700">
+          <div className="max-w-7xl mx-auto px-5 lg:px-8">
+            <div className="flex items-center gap-2.5 mb-8">
+              <Megaphone size={18} className="text-charo-orange" />
+              <h2 className="font-display text-2xl md:text-3xl">Annonces de la guilde</h2>
+            </div>
+            <div className="grid md:grid-cols-3 gap-5">
+              {announcements.map((a) => (
+                <div key={a.id} className="card p-6">
+                  {a.title && <p className="font-bold mb-1.5">{a.title}</p>}
+                  <p className="text-sm text-ink-600 leading-relaxed">{a.body}</p>
+                  <p className="text-[11px] text-ink-600 mt-3">{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ================= PROCESS ================= */}
       <section className="py-20 lg:py-28 border-t border-ink-700">
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
           <span className="eyebrow mb-4">Comment participer</span>
-          <h2 className="font-display text-4xl md:text-5xl mb-14 max-w-xl text-ink-900">Du Début à la grande finale.</h2>
+          <h2 className="font-display text-4xl md:text-5xl mb-14 max-w-xl">Du sofa à la grande finale.</h2>
 
           <div className="grid md:grid-cols-5 gap-5">
             {processSteps.map((s, i) => (
               <div key={s.n} className="relative">
-                <p className="font-display text-5xl text-ink-600 mb-4">{s.n}</p>
+                <p className="font-display text-5xl text-ink-700 mb-4">{s.n}</p>
                 <h3 className="font-bold text-ink-950 mb-2">{s.title}</h3>
                 <p className="text-sm text-ink-600 leading-relaxed">{s.text}</p>
                 {i < processSteps.length - 1 && (
@@ -335,8 +342,8 @@ export default function Landing() {
       {/* ================= LOTS & DOTATIONS ================= */}
       <section className="py-20 lg:py-28 border-t border-ink-700">
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
-          <span className="eyebrow mb-4 text-charo-orange">Récompenses</span>
-          <h2 className="font-display text-4xl md:text-5xl mb-14 max-w-xl text-ink-900">Lots &amp; dotations.</h2>
+          <span className="eyebrow mb-4">Récompenses</span>
+          <h2 className="font-display text-4xl md:text-5xl mb-14 max-w-xl">Lots &amp; dotations.</h2>
 
           <div className="grid md:grid-cols-3 gap-6 items-stretch">
             {prizeTiers.map((t) => (
@@ -352,7 +359,7 @@ export default function Landing() {
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
                     t.featured
                       ? 'bg-charo-orange text-white shadow-glow'
-                      : 'bg-ink-800 text-ink-600'
+                      : 'bg-ink-100 text-ink-700'
                   }`}>
                     {t.featured ? <Crown size={22} /> : <Award size={22} />}
                   </div>
@@ -388,7 +395,7 @@ export default function Landing() {
                 <Trophy size={20} />
               </div>
               <div>
-                <p className="font-bold text-ink-900">MVP du tournoi</p>
+                <p className="font-bold text-ink-800">MVP du tournoi</p>
                 <p className="text-sm text-ink-600 mt-1">400 diamants, attribués par les juges selon les performances, la régularité, le niveau de jeu, le fair-play et l’impact sur la compétition.</p>
               </div>
             </div>

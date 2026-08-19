@@ -48,7 +48,7 @@ export default function Groupes() {
       <section className="py-14 lg:py-20">
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
           <span className="eyebrow mb-4">Phase de qualifications</span>
-          <h1 className="font-display text-4xl md:text-5xl mb-4 text-ink-900">Les 10 groupes</h1>
+          <h1 className="font-display text-4xl md:text-5xl mb-4">Les 10 groupes</h1>
           <p className="text-ink-600 max-w-xl mb-12">
             40 joueurs, 10 groupes de 4, championnat interne. Le 1er de chaque groupe est qualifié d'office ;
             les 12 meilleurs joueurs restants complètent le Top 32 après avoir retenu les 2 premiers de chaque groupe.

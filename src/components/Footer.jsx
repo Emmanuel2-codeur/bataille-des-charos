@@ -31,11 +31,10 @@ export default function Footer() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-charo-orange mb-4">Tournoi</p>
           <ul className="space-y-2.5 text-sm text-ink-600">
-            <li><Link to="/matchs" className="hover:text-ink-950 transition-colors">Matchs programmés</Link></li>
+            <li><Link to="/dashboard" className="hover:text-ink-950 transition-colors">Dashboard Live</Link></li>
             <li><Link to="/groupes" className="hover:text-ink-950 transition-colors">Phase de poules</Link></li>
             <li><Link to="/bracket" className="hover:text-ink-950 transition-colors">Arbre final</Link></li>
             <li><Link to="/classement" className="hover:text-ink-950 transition-colors">Classement</Link></li>
-            <li><Link to="/annonces" className="hover:text-ink-950 transition-colors">Annonces</Link></li>
             <li><Link to="/reglement" className="hover:text-ink-950 transition-colors">Règlement complet</Link></li>
           </ul>
         </div>

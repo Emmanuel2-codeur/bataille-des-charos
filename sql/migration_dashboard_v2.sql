@@ -163,7 +163,7 @@ create policy "announcements_admin_delete"
 alter publication supabase_realtime add table public.announcements;
 
 -- ----------------------------------------------------------------------------
--- 5. Passage automatique "Programmé" → "En cours" à l'heure programmée,
+-- 5. Passage automatique "Programmé" → "Live" à l'heure programmée,
 --    même si personne n'a le site ouvert (pg_cron, exécution serveur).
 -- ----------------------------------------------------------------------------
 -- ⚠️ Étape manuelle requise UNE SEULE FOIS avant d'exécuter la suite :
@@ -177,13 +177,13 @@ language sql
 security definer set search_path = public
 as $$
   update public.matches
-    set status = 'in_progress'
+    set status = 'live'
     where status = 'scheduled'
       and scheduled_at is not null
       and scheduled_at <= now();
 $$;
 
-comment on function public.activate_scheduled_matches is 'Appelée chaque minute par pg_cron : passe en En cours tout match programmé dont l''heure est arrivée.';
+comment on function public.activate_scheduled_matches is 'Appelée chaque minute par pg_cron : passe en Live tout match programmé dont l''heure est arrivée.';
 
 -- Supprime une éventuelle ancienne programmation avant d'en recréer une
 select cron.unschedule(jobid) from cron.job where jobname = 'activate-scheduled-matches';

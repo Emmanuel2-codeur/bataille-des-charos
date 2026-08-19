@@ -19,7 +19,7 @@ create type public.player_status   as enum ('pending', 'approved', 'rejected');
 create type public.match_type      as enum ('onetap', 'spam');           -- Aller = onetap (headshot only) / Retour = spam (bodyshot)
 create type public.match_leg       as enum ('aller', 'retour');
 create type public.match_phase     as enum ('poule', 'huitieme', 'quart', 'demie', 'finale');
-create type public.match_status    as enum ('scheduled', 'in_progress', 'completed');
+create type public.match_status    as enum ('scheduled', 'live', 'completed');
 
 -- ----------------------------------------------------------------------------
 -- 2. TABLE: groups — Les 10 poules (A à J)
@@ -436,7 +436,7 @@ create policy "groups_admin_delete"
 -- ---- MATCHES ---------------------------------------------------------
 create policy "matches_select_public"
   on public.matches for select
-  using (true);  -- suivi en cours public
+  using (true);  -- suivi live public
 
 create policy "matches_admin_insert"
   on public.matches for insert
@@ -454,7 +454,7 @@ create policy "matches_admin_delete"
 -- ============================================================================
 -- 8. REALTIME
 -- ============================================================================
--- Active la réplication realtime pour le suivi en cours des scores côté public
+-- Active la réplication realtime pour le suivi live des scores côté public
 alter publication supabase_realtime add table public.matches;
 alter publication supabase_realtime add table public.profiles;
 

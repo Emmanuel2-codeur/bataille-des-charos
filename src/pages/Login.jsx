@@ -79,7 +79,7 @@ export default function Login() {
             type="button"
             onClick={handleGoogle}
             disabled={googleLoading}
-            className="w-full inline-flex items-center justify-center gap-3 rounded-xl border border-ink-700 bg-white px-6 py-3.5 font-bold text-ink-950 shadow-card hover:border-ink-950/20 hover:shadow-card-lg active:scale-[0.98] transition-all disabled:opacity-60"
+            className="w-full inline-flex items-center justify-center gap-3 rounded-xl border border-ink-200 bg-white px-6 py-3.5 font-bold text-ink-950 shadow-card hover:border-ink-950/20 hover:shadow-card-lg active:scale-[0.98] transition-all disabled:opacity-60"
           >
             <GoogleGlyph />
             {googleLoading ? 'Redirection vers Google…' : 'Continuer avec Google'}
@@ -109,7 +109,7 @@ export default function Login() {
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
                       placeholder="joueur@email.com"
-                      className="w-full rounded-xl border border-ink-700 pl-10 pr-4 py-3.5 outline-none focus:border-charo-orange"
+                      className="w-full rounded-xl border border-ink-200 pl-10 pr-4 py-3.5 outline-none focus:border-charo-orange"
                     />
                   </div>
                 </label>
