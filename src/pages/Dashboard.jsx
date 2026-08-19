@@ -63,8 +63,8 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-6 mb-10">
             <div>
-              <span className="eyebrow mb-4"><Radio size={12} className="inline -mt-0.5" /> Dashboard Live</span>
-              <h1 className="font-display text-ink-700 text-4xl md:text-5xl">Matchs du jour</h1>
+              <span className="eyebrow mb-4"><Radio size={12} className="inline -mt-0.5" /> Dashboard En cours</span>
+              <h1 className="font-display text-ink-600 text-4xl md:text-5xl">Matchs du jour</h1>
               <p className="text-ink-600 mt-3 max-w-lg">
                 {liveCount} match{liveCount > 1 ? 's' : ''} en cours actuellement. Les scores se synchronisent automatiquement.
               </p>

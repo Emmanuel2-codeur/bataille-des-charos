@@ -241,6 +241,7 @@ function CommentNode({ comment, comments, reactions, user, isAdmin, onRefresh, d
 function AnnouncementCard({ announcement, user, isAdmin }) {
   const [comments, setComments] = useState([])
   const [reactions, setReactions] = useState([])
+  const [commentReactions, setCommentReactions] = useState([])
   const [commentText, setCommentText] = useState('')
   const [commentFile, setCommentFile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -248,14 +249,35 @@ function AnnouncementCard({ announcement, user, isAdmin }) {
   const [error, setError] = useState('')
 
   const loadSocial = useCallback(async () => {
-    const [{ data: commentRows, error: commentsError }, { data: reactionRows, error: reactionsError }] = await Promise.all([
+    const [
+      { data: commentRows, error: commentsError },
+      { data: reactionRows, error: reactionsError },
+    ] = await Promise.all([
       supabase.from('comments').select('id, announcement_id, user_id, parent_id, content, attachment_url, attachment_name, attachment_type, attachment_size, created_at, updated_at, profile:profiles!comments_user_id_fkey(id, pseudo, avatar_url, role)').eq('announcement_id', announcement.id).order('created_at', { ascending: true }),
       supabase.from('announcement_reactions').select('announcement_id, user_id, reaction, created_at').eq('announcement_id', announcement.id),
     ])
+
+    const commentIds = (commentRows || []).map((comment) => comment.id)
+    let commentReactionRows = []
+    let commentReactionsError = null
+
+    if (commentIds.length > 0) {
+      const result = await supabase
+        .from('comment_reactions')
+        .select('comment_id, user_id, reaction, created_at')
+        .in('comment_id', commentIds)
+
+      commentReactionRows = result.data || []
+      commentReactionsError = result.error
+    }
+
     if (commentsError) console.error('[Comments]', commentsError)
-    if (reactionsError) console.error('[Reactions]', reactionsError)
+    if (reactionsError) console.error('[Announcement reactions]', reactionsError)
+    if (commentReactionsError) console.error('[Comment reactions]', commentReactionsError)
+
     setComments(commentRows || [])
     setReactions(reactionRows || [])
+    setCommentReactions(commentReactionRows)
     setLoading(false)
   }, [announcement.id])
 
@@ -331,7 +353,7 @@ function AnnouncementCard({ announcement, user, isAdmin }) {
       </div>
 
       <div className="mt-4">
-        {loading ? <div className="py-4 text-xs text-ink-600 flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" /> Chargement des commentaires…</div> : roots.length > 0 ? <div>{roots.map((comment) => <CommentNode key={comment.id} comment={comment} comments={comments} reactions={reactions} user={user} isAdmin={isAdmin} onRefresh={loadSocial} />)}</div> : <p className="text-xs text-ink-600 py-2">Aucun commentaire pour le moment.</p>}
+        {loading ? <div className="py-4 text-xs text-ink-600 flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" /> Chargement des commentaires…</div> : roots.length > 0 ? <div>{roots.map((comment) => <CommentNode key={comment.id} comment={comment} comments={comments} reactions={commentReactions} user={user} isAdmin={isAdmin} onRefresh={loadSocial} />)}</div> : <p className="text-xs text-ink-600 py-2">Aucun commentaire pour le moment.</p>}
       </div>
 
       {user ? (

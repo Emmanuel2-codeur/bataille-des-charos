@@ -92,38 +92,70 @@ export default function NotificationCenter() {
     setItems(data || [])
     setLoading(false)
   }, [session?.user?.id])
+useEffect(() => {
+  let disposed = false
+  let channel = null
 
-  useEffect(() => {
-    load()
-    if (!session?.user?.id) return undefined
+  load()
 
-    const channel = supabase
-      .channel(`notifications-${session.user.id}`)
-      .on('postgres_changes', {
+  const userId = session?.user?.id
+  if (!userId) return undefined
+
+  // React 18 StrictMode peut monter/démonter l'effet deux fois en développement.
+  // Un nom de canal fixe peut alors réutiliser un canal encore en suppression,
+  // ce qui provoque: "cannot add postgres_changes callbacks ... after subscribe()".
+  const channelName = `notifications-${userId}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
-        filter: `recipient_id=eq.${session.user.id}`,
-      }, (payload) => {
-        const notification = payload.new
-        setItems((current) => [notification, ...current].slice(0, 40))
+        filter: `recipient_id=eq.${userId}`,
+      },
+      (payload) => {
+        if (disposed) return
 
-        if (document.visibilityState === 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+        const notification = payload.new
+
+        setItems((current) =>
+          [notification, ...current].slice(0, 40)
+        )
+
+        if (
+          document.visibilityState === 'visible' &&
+          'Notification' in window &&
+          Notification.permission === 'granted'
+        ) {
           try {
             new Notification(notification.title, {
               body: notification.body,
               icon: '/logo.jpg',
             })
           } catch {
-            // Le centre intégré reste disponible si la notification système échoue.
+            // Rien à faire.
           }
         }
-      })
-      .subscribe()
+      }
+    )
 
-    return () => { supabase.removeChannel(channel) }
-  }, [session?.user?.id, load])
+  channel.subscribe((status) => {
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      console.warn(`[Notifications] Canal realtime: ${status}`)
+    }
+  })
 
+  return () => {
+    disposed = true
+    if (channel) {
+      void supabase.removeChannel(channel)
+      channel = null
+    }
+  }
+}, [session?.user?.id, load])
   useEffect(() => {
     if (!session?.user?.id) return
     const asked = window.localStorage.getItem('charos-push-asked')

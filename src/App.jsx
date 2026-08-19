@@ -1,6 +1,5 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Landing from './pages/Landing'
-import Dashboard from './pages/Dashboard'
 import Groupes from './pages/Groupes'
 import Bracket from './pages/Bracket'
 import Reglement from './pages/Reglement'
@@ -11,12 +10,15 @@ import Historique from './pages/Historique'
 import Profil from './pages/Profil'
 import AdminRoute from './components/AdminRoute'
 import Matchs from './pages/Matchs'
+import Annonces from './pages/Annonces'
+import BackToTop from './components/BackToTop'
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/dashboard" element={<Navigate to="/matchs" replace />} />
       <Route path="/groupes" element={<Groupes />} />
       <Route path="/bracket" element={<Bracket />} />
       <Route path="/reglement" element={<Reglement />} />
@@ -25,6 +27,7 @@ export default function App() {
       <Route path="/connexion" element={<Login />} />
       <Route path="/profil" element={<Profil />} />
       <Route path="/matchs" element={<Matchs />} />
+      <Route path="/annonces" element={<Annonces />} />
       <Route
         path="/admin"
         element={
@@ -34,5 +37,7 @@ export default function App() {
         }
       />
     </Routes>
+    <BackToTop />
+    </>
   )
 }

@@ -1,6 +1,6 @@
 import { Crosshair, Target, Clock } from 'lucide-react'
 
-function PlayerRow({ name, score, damage, isWinner, isLive }) {
+function PlayerRow({ name, score, damage, isWinner }) {
   const initials = name.slice(0, 2).toUpperCase()
   return (
     <div className={`flex items-center justify-between py-2.5 ${isWinner ? 'opacity-100' : 'opacity-90'}`}>
@@ -32,11 +32,11 @@ export default function MatchCard({ match }) {
 
   return (
     <div className="card p-5 relative overflow-hidden hover:border-charo-orange/50 transition-colors">
-      {status === 'live' && <div className="absolute inset-x-0 top-0 h-0.5 bg-live animate-pulse" />}
+      {status === 'in_progress' && <div className="absolute inset-x-0 top-0 h-0.5 bg-live animate-pulse" />}
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold text-ink-600 uppercase tracking-wide">{roundLabel}</span>
-        {status === 'live' ? (
-          <span className="badge-live"><span className="w-1.5 h-1.5 rounded-full bg-live animate-ping" />Live</span>
+        {status === 'in_progress' ? (
+          <span className="badge-in-progress"><span className="w-1.5 h-1.5 rounded-full bg-live animate-ping" />En cours</span>
         ) : status === 'completed' ? (
           <span className="text-xs font-bold text-ink-600 uppercase tracking-wide">Terminé</span>
         ) : (

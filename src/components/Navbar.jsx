@@ -1,22 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Menu, X, Swords, ShieldCheck, UserRound, LogOut } from 'lucide-react'
+import NotificationCenter from './NotificationCenter'
 import logo from '../assets/logo.jpg'
 import { useAuth } from '../lib/AuthContext'
+import { NAV_LINKS } from '../config'
 import { signOut } from '../lib/supabaseClient'
 
-const links = [
-  { to: '/', label: 'Accueil' },
-  { to: '/dashboard', label: 'Live' },
-  { to: '/groupes', label: 'Poules' },
-  { to: '/bracket', label: 'Bracket' },
-  { to: '/classement', label: 'Classement' },
-  { to: '/historique', label: 'Historique' },
-]
+const links = NAV_LINKS
+
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const { session, profile, isAdmin } = useAuth()
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) setOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open])
 
   const handleSignOut = async () => {
     await signOut()
@@ -24,7 +44,7 @@ export default function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-ink-700 bg-white/95 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-ink-700 bg-white/95 backdrop-blur-md relative">
       <div className="max-w-7xl mx-auto px-5 lg:px-8 h-20 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
           <img src={logo} alt="Guilde MÉCHANTCHARO" className="w-8 h-8 rounded-full object-cover ring-2 ring-charo-orange/60" />
@@ -51,6 +71,7 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden lg:flex items-center gap-3">
+          {session && <NotificationCenter />}
           {isAdmin && (
             <Link to="/admin" className="btn-outline !px-4 !py-2 text-xs">
               <ShieldCheck size={14} /> Admin
@@ -59,14 +80,14 @@ export default function Navbar() {
 
           {session ? (
             <div className="flex items-center gap-2">
-              <Link to="/profil" className="flex items-center gap-2 rounded-xl border border-ink-200 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:border-charo-orange transition-colors">
+              <Link to="/profil" className="flex items-center gap-2 rounded-xl border border-ink-700 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:border-charo-orange transition-colors">
                 <UserRound size={16} className="text-charo-orange" />
                 {profile?.pseudo || 'Mon profil'}
                 {profile?.status === 'pending' && (
                   <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">En attente</span>
                 )}
               </Link>
-              <button onClick={handleSignOut} className="w-9 h-9 rounded-xl border border-ink-200 flex items-center justify-center text-ink-600 hover:text-red-600 hover:border-red-200 transition-colors" aria-label="Se déconnecter">
+              <button onClick={handleSignOut} className="w-9 h-9 rounded-xl border border-ink-700 flex items-center justify-center text-ink-600 hover:text-red-600 hover:border-red-200 transition-colors" aria-label="Se déconnecter">
                 <LogOut size={15} />
               </button>
             </div>
@@ -84,12 +105,18 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <div className="lg:hidden border-t border-ink-700 bg-white px-5 py-6 flex flex-col gap-5">
+        <div className="lg:hidden absolute left-0 right-0 top-full border-t border-ink-700 bg-white px-5 py-6 flex flex-col gap-5 shadow-2xl">
           {links.map((l) => (
             <NavLink key={l.to} to={l.to} onClick={() => setOpen(false)} className="text-ink-950 font-semibold text-base">
               {l.label}
             </NavLink>
           ))}
+
+          {session && (
+            <div className="pt-2 border-t border-ink-700">
+              <NotificationCenter />
+            </div>
+          )}
 
           {isAdmin && (
             <Link to="/admin" onClick={() => setOpen(false)} className="text-charo-orange font-semibold text-base flex items-center gap-2">
