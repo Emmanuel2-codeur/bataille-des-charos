@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
   ShieldAlert, Check, X, Star, Clock, Save, RefreshCw, Mail,
-  UserPlus, CalendarPlus, ClipboardCheck, Megaphone, Trash2, Pencil, Trophy,
+  UserPlus, CalendarPlus, ClipboardCheck, Megaphone, Trash2, Pencil, Trophy, Paperclip,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
+import { uploadPublicFile } from '../lib/storage'
 
 const MATCH_TYPES = [
   { value: 'onetap', label: 'One Tap (Aller)' },
@@ -21,6 +23,7 @@ const PHASES = [
 ]
 
 export default function Admin() {
+  const { profile } = useAuth()
   const [pending, setPending] = useState([])
   const [groups, setGroups] = useState([])
   const [players, setPlayers] = useState([]) // joueurs approuvés, pour les selects
@@ -53,10 +56,10 @@ export default function Admin() {
       supabase
         .from('matches')
         .select(
-          'id, phase, group_id, leg, match_type, round_label, player1_id, player2_id, score1, score2, damage1, damage2, status, is_featured, scheduled_at, player1:profiles!matches_player1_id_fkey(pseudo), player2:profiles!matches_player2_id_fkey(pseudo)'
+          'id, phase, group_id, leg, match_type, round_label, player1_id, player2_id, score1, score2, damage1, damage2, status, status_override, is_featured, scheduled_at, player1:profiles!matches_player1_id_fkey(pseudo), player2:profiles!matches_player2_id_fkey(pseudo)'
         )
         .order('scheduled_at', { ascending: true, nullsFirst: false }),
-      supabase.from('announcements').select('id, title, body, published, created_at').order('created_at', { ascending: false }),
+      supabase.from('announcements').select('id, title, body, published, category, image_url, author_id, created_at').order('created_at', { ascending: false }),
     ])
 
     const firstError = pendingError || groupsError || playersError || matchesError || announceError
@@ -87,10 +90,10 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-5 mb-10">
             <div>
               <span className="eyebrow mb-4"><ShieldAlert size={12} /> Espace administration</span>
-              <h1 className="font-display text-4xl md:text-5xl mb-2">Panneau de contrôle</h1>
+              <h1 className="font-display text-4xl md:text-5xl mb-2 text-ink-700">Panneau de contrôle</h1>
               <p className="text-ink-600 max-w-xl">
                 Chaque action ici met à jour le site en direct : joueur validé → visible dans son groupe et
-                le classement · match programmé → apparaît en Live à l'heure dite · info publiée → visible à l'accueil.
+                le classement · match programmé → apparaît en En cours à l'heure dite · info publiée → visible à l'accueil.
               </p>
             </div>
             <button onClick={loadAll} className="btn-primary" disabled={loading}>
@@ -132,6 +135,7 @@ export default function Admin() {
 
           <AnnouncementsSection
             announcements={announcements}
+            authorId={profile?.id}
             onChanged={loadAll} setError={setError} setMessage={setMessage}
           />
         </div>
@@ -174,7 +178,7 @@ function PendingSection({ pending, groups, onChanged, setError, setMessage }) {
     <div className="mb-14">
       <div className="flex items-center gap-2.5 mb-1">
         <UserPlus size={18} className="text-charo-orange" />
-        <h2 className="font-bold text-lg">Accepter les invitations du joueur</h2>
+        <h2 className="font-bold text-lg text-ink-700">Accepter les invitations du joueur</h2>
       </div>
       <p className="text-sm text-ink-600 mb-5">
         Choisis un groupe puis valide : le joueur passe direct dans Poules et Classement.
@@ -245,7 +249,7 @@ function PlayerManagementSection({ players, groups, onChanged, setError, setMess
 
   return (
     <div className="mb-14">
-      <div className="flex items-center gap-2.5 mb-1"><Trophy size={18} className="text-charo-orange" /><h2 className="font-bold text-lg">Joueurs approuvés / classement</h2></div>
+      <div className="flex items-center gap-2.5 mb-1"><Trophy size={18} className="text-charo-orange" /><h2 className="font-bold text-lg text-ink-700">Joueurs approuvés / classement</h2></div>
       <p className="text-sm text-ink-600 mb-5">Modifie les informations d’un joueur qui alimentent le classement, ou supprime son inscription.</p>
       <div className="card divide-y divide-ink-700 overflow-hidden">
         {players.length === 0 && <p className="p-6 text-sm text-ink-600">Aucun joueur approuvé.</p>}
@@ -256,23 +260,23 @@ function PlayerManagementSection({ players, groups, onChanged, setError, setMess
               <div className="flex flex-wrap items-center gap-4">
                 <div className="min-w-[180px] flex-1">
                   {editing?.id === p.id ? (
-                    <input value={row.pseudo} onChange={(e) => setEditing({ ...row, pseudo: e.target.value })} className="w-full rounded-lg bg-white border border-ink-300 text-sm px-3 py-2" />
+                    <input value={row.pseudo} onChange={(e) => setEditing({ ...row, pseudo: e.target.value })} className="w-full rounded-lg bg-white border border-ink-700 text-sm px-3 py-2" />
                   ) : <p className="font-semibold">{p.pseudo}</p>}
                   <p className="text-xs text-ink-600 mt-1">{p.wins} V · {p.losses} D · {p.total_kills || 0} kills · {(p.total_damage || 0).toLocaleString('fr-FR')} dégâts · {p.total_points || 0} pts</p>
                 </div>
                 {editing?.id === p.id ? (
                   <>
-                    <input value={row.ff_uid || ''} onChange={(e) => setEditing({ ...row, ff_uid: e.target.value })} placeholder="ID Free Fire" className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2" />
-                    <select value={row.group_id || ''} onChange={(e) => setEditing({ ...row, group_id: e.target.value })} className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2">
+                    <input value={row.ff_uid || ''} onChange={(e) => setEditing({ ...row, ff_uid: e.target.value })} placeholder="ID Free Fire" className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2" />
+                    <select value={row.group_id || ''} onChange={(e) => setEditing({ ...row, group_id: e.target.value })} className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2">
                       <option value="">Sans groupe</option>{groups.map(g => <option key={g.id} value={g.id}>Groupe {g.name}</option>)}
                     </select>
                     <button onClick={() => save(row)} disabled={saving} className="w-9 h-9 rounded-lg bg-charo-orange text-white flex items-center justify-center"><Save size={15} /></button>
-                    <button onClick={() => setEditing(null)} className="w-9 h-9 rounded-lg border border-ink-300 text-ink-600 flex items-center justify-center"><X size={15} /></button>
+                    <button onClick={() => setEditing(null)} className="w-9 h-9 rounded-lg border border-ink-700 text-ink-600 flex items-center justify-center"><X size={15} /></button>
                   </>
                 ) : (
                   <>
-                    <span className="text-xs font-semibold px-3 py-2 rounded-lg bg-ink-100">Groupe {groups.find(g => g.id === p.group_id)?.name || '—'}</span>
-                    <button onClick={() => setEditing({ ...p })} className="w-9 h-9 rounded-lg border border-ink-300 text-ink-700 flex items-center justify-center hover:bg-ink-100" aria-label="Modifier"><Pencil size={15} /></button>
+                    <span className="text-xs font-semibold px-3 py-2 rounded-lg bg-ink-800">Groupe {groups.find(g => g.id === p.group_id)?.name || '—'}</span>
+                    <button onClick={() => setEditing({ ...p })} className="w-9 h-9 rounded-lg border border-ink-700 text-ink-600 flex items-center justify-center hover:bg-ink-800" aria-label="Modifier"><Pencil size={15} /></button>
                     <button onClick={() => remove(p.id)} className="w-9 h-9 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white" aria-label="Supprimer"><Trash2 size={15} /></button>
                   </>
                 )}
@@ -306,7 +310,7 @@ function QualificationSection({ onChanged, setError, setMessage }) {
   }
   return (
     <div className="mb-14">
-      <div className="flex items-center gap-2.5 mb-1"><Trophy size={18} className="text-charo-orange" /><h2 className="font-bold text-lg">Qualification pour les seizièmes — 32 joueurs</h2></div>
+      <div className="flex items-center gap-2.5 mb-1"><Trophy size={18} className="text-charo-orange" /><h2 className="font-bold text-lg text-ink-700">Qualification pour les seizièmes — 32 joueurs</h2></div>
       <p className="text-sm text-ink-600 mb-5">2 joueurs par groupe (20) sont retenus, puis les 12 meilleurs joueurs restants complètent les 32 selon points, dégâts et kills.</p>
       <div className="card p-5 flex flex-wrap gap-3">
         <button onClick={compute} disabled={busy} className="btn-primary"><Trophy size={15} /> Calculer les 32 qualifiés</button>
@@ -345,11 +349,12 @@ function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage
       phase: form.phase,
       group_id: form.phase === 'poule' ? (form.group_id || null) : null,
       status: 'scheduled',
+      status_override: false,
     })
 
     if (error) setError(error.message)
     else {
-      setMessage('Match programmé. Il passera en Live tout seul à l’heure prévue.')
+      setMessage('Match programmé. Il passera en cours tout seul à l’heure prévue.')
       set({ player1_id: '', player2_id: '', scheduled_at: '' })
       onCreated()
     }
@@ -360,10 +365,10 @@ function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage
     <div className="mb-14">
       <div className="flex items-center gap-2.5 mb-1">
         <CalendarPlus size={18} className="text-charo-orange" />
-        <h2 className="font-bold text-lg">Programmer un match</h2>
+        <h2 className="font-bold text-lg text-ink-700">Programmer un match</h2>
       </div>
       <p className="text-sm text-ink-600 mb-5">
-        Dès l'heure programmée atteinte, le match passe automatiquement en Live sur le Dashboard.
+        Dès l'heure programmée atteinte, le match passe automatiquement en cours sur le Dashboard.
       </p>
 
       <form onSubmit={createMatch} className="card p-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -472,10 +477,10 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
     <div className="mb-14">
       <div className="flex items-center gap-2.5 mb-1">
         <ClipboardCheck size={18} className="text-charo-orange" />
-        <h2 className="font-bold text-lg">Valider le score du match</h2>
+        <h2 className="font-bold text-lg text-ink-700">Valider le score du match</h2>
       </div>
       <p className="text-sm text-ink-600 mb-5">
-        Score = kills du joueur sur ce match. Une fois validé, le match sort automatiquement du Live et rejoint l'Historique.
+        Score = kills du joueur sur ce match. Une fois validé, le match sort automatiquement des matchs en cours et rejoint l'Historique.
       </p>
 
       <div className="card divide-y divide-ink-700">
@@ -486,7 +491,7 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
               <p className="text-sm font-semibold">{m.player1?.pseudo || '—'} <span className="text-ink-600">vs</span> {m.player2?.pseudo || '—'}</p>
               <p className="text-xs text-ink-600 flex items-center gap-1.5 mt-1">
                 <Clock size={11} /> {m.round_label || m.phase} · {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString('fr-FR') : 'sans horaire'} ·{' '}
-                <span className={m.status === 'live' ? 'text-live font-bold' : ''}>{m.status === 'live' ? 'EN DIRECT' : m.status === 'scheduled' ? 'Programmé' : m.status}</span>
+                <span className={m.status === 'in_progress' ? 'text-live font-bold' : ''}>{m.status === 'in_progress' ? 'EN COURS' : m.status === 'scheduled' ? 'Programmé' : m.status}</span>
               </p>
             </div>
 
@@ -538,7 +543,7 @@ function MatchManagementSection({ matches, players, groups, onChanged, setError,
       match_type: m.match_type, scheduled_at: m.scheduled_at || null,
       score1: Number(m.score1 || 0), score2: Number(m.score2 || 0),
       damage1: Number(m.damage1 || 0), damage2: Number(m.damage2 || 0),
-      status: m.status, is_featured: !!m.is_featured, round_label: m.round_label || null,
+      status: m.status, status_override: !!m.status_override, is_featured: !!m.is_featured, round_label: m.round_label || null,
     }).eq('id', m.id)
     if (error) setError(error.message)
     else { setMessage('Match modifié et statistiques recalculées si nécessaire.'); setEditing(null); onChanged() }
@@ -554,7 +559,7 @@ function MatchManagementSection({ matches, players, groups, onChanged, setError,
 
   return (
     <div className="mb-14">
-      <div className="flex items-center gap-2.5 mb-1"><Pencil size={18} className="text-charo-orange" /><h2 className="font-bold text-lg">Gestion des matchs</h2></div>
+      <div className="flex items-center gap-2.5 mb-1"><Pencil size={18} className="text-charo-orange" /><h2 className="font-bold text-lg text-ink-700">Gestion des matchs</h2></div>
       <p className="text-sm text-ink-600 mb-5">Chaque match enregistré peut être modifié ou supprimé. Une modification de score/dégâts recalcule le classement.</p>
       <div className="card divide-y divide-ink-700 overflow-hidden">
         {matches.map((m) => {
@@ -562,23 +567,27 @@ function MatchManagementSection({ matches, players, groups, onChanged, setError,
           return <div key={m.id} className="p-5">
             {editing?.id === m.id ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-                <select value={row.player1_id || ''} onChange={e => setEditing({ ...row, player1_id: e.target.value })} className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2"><option value="">Joueur 1</option>{players.map(p => <option key={p.id} value={p.id}>{p.pseudo}</option>)}</select>
-                <select value={row.player2_id || ''} onChange={e => setEditing({ ...row, player2_id: e.target.value })} className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2"><option value="">Joueur 2</option>{players.map(p => <option key={p.id} value={p.id}>{p.pseudo}</option>)}</select>
-                <select value={row.phase} onChange={e => setEditing({ ...row, phase: e.target.value })} className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2">{PHASES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
-                <select value={row.status} onChange={e => setEditing({ ...row, status: e.target.value })} className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2"><option value="scheduled">Programmé</option><option value="live">Live</option><option value="completed">Terminé</option></select>
-                <input type="number" min="0" value={row.score1 ?? 0} onChange={e => setEditing({ ...row, score1: e.target.value })} placeholder="Kills J1" className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2" />
-                <input type="number" min="0" value={row.score2 ?? 0} onChange={e => setEditing({ ...row, score2: e.target.value })} placeholder="Kills J2" className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2" />
-                <input type="number" min="0" value={row.damage1 ?? 0} onChange={e => setEditing({ ...row, damage1: e.target.value })} placeholder="Dégâts J1" className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2" />
-                <input type="number" min="0" value={row.damage2 ?? 0} onChange={e => setEditing({ ...row, damage2: e.target.value })} placeholder="Dégâts J2" className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2" />
-                <input value={row.round_label || ''} onChange={e => setEditing({ ...row, round_label: e.target.value })} placeholder="Libellé du tour" className="rounded-lg bg-white border border-ink-300 text-sm px-3 py-2" />
+                <select value={row.player1_id || ''} onChange={e => setEditing({ ...row, player1_id: e.target.value })} className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2"><option value="">Joueur 1</option>{players.map(p => <option key={p.id} value={p.id}>{p.pseudo}</option>)}</select>
+                <select value={row.player2_id || ''} onChange={e => setEditing({ ...row, player2_id: e.target.value })} className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2"><option value="">Joueur 2</option>{players.map(p => <option key={p.id} value={p.id}>{p.pseudo}</option>)}</select>
+                <select value={row.phase} onChange={e => setEditing({ ...row, phase: e.target.value })} className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2">{PHASES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
+                <select value={row.status} onChange={e => setEditing({ ...row, status: e.target.value, status_override: true })} className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2"><option value="scheduled">Programmé</option><option value="in_progress">En cours</option><option value="completed">Terminé</option></select>
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-600 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                  <input type="checkbox" checked={!!row.status_override} onChange={e => setEditing({ ...row, status_override: e.target.checked })} />
+                  Contrôle manuel du statut
+                </label>
+                <input type="number" min="0" value={row.score1 ?? 0} onChange={e => setEditing({ ...row, score1: e.target.value })} placeholder="Kills J1" className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2" />
+                <input type="number" min="0" value={row.score2 ?? 0} onChange={e => setEditing({ ...row, score2: e.target.value })} placeholder="Kills J2" className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2" />
+                <input type="number" min="0" value={row.damage1 ?? 0} onChange={e => setEditing({ ...row, damage1: e.target.value })} placeholder="Dégâts J1" className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2" />
+                <input type="number" min="0" value={row.damage2 ?? 0} onChange={e => setEditing({ ...row, damage2: e.target.value })} placeholder="Dégâts J2" className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2" />
+                <input value={row.round_label || ''} onChange={e => setEditing({ ...row, round_label: e.target.value })} placeholder="Libellé du tour" className="rounded-lg bg-white border border-ink-700 text-sm px-3 py-2" />
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!row.is_featured} onChange={e => setEditing({ ...row, is_featured: e.target.checked })} /> À la une</label>
-                <div className="flex gap-2"><button onClick={() => save(row)} disabled={saving} className="w-9 h-9 rounded-lg bg-charo-orange text-white flex items-center justify-center"><Save size={15} /></button><button onClick={() => setEditing(null)} className="w-9 h-9 rounded-lg border border-ink-300 text-ink-600 flex items-center justify-center"><X size={15} /></button></div>
+                <div className="flex gap-2"><button onClick={() => save(row)} disabled={saving} className="w-9 h-9 rounded-lg bg-charo-orange text-white flex items-center justify-center"><Save size={15} /></button><button onClick={() => setEditing(null)} className="w-9 h-9 rounded-lg border border-ink-700 text-ink-600 flex items-center justify-center"><X size={15} /></button></div>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-4">
                 <div className="min-w-[220px] flex-1"><p className="font-semibold">{m.player1?.pseudo || '—'} <span className="text-ink-600">vs</span> {m.player2?.pseudo || '—'}</p><p className="text-xs text-ink-600 mt-1">{m.round_label || m.phase} · {m.status} · {m.score1}-{m.score2} kills · {m.damage1}-{m.damage2} dégâts</p></div>
-                <span className="text-xs px-2.5 py-1 rounded-full bg-ink-100">{m.phase}</span>
-                <button onClick={() => setEditing({ ...m })} className="w-9 h-9 rounded-lg border border-ink-300 text-ink-700 flex items-center justify-center hover:bg-ink-100"><Pencil size={15} /></button>
+                <span className="text-xs px-2.5 py-1 rounded-full bg-ink-800">{m.phase}</span>
+                <button onClick={() => setEditing({ ...m })} className="w-9 h-9 rounded-lg border border-ink-700 text-ink-600 flex items-center justify-center hover:bg-ink-800"><Pencil size={15} /></button>
                 <button onClick={() => remove(m.id)} className="w-9 h-9 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white"><Trash2 size={15} /></button>
               </div>
             )}
@@ -592,81 +601,156 @@ function MatchManagementSection({ matches, players, groups, onChanged, setError,
 /* ============================================================================
    6. AJOUTER UNE INFORMATION
    ========================================================================= */
-function AnnouncementsSection({ announcements, onChanged, setError, setMessage }) {
+function AnnouncementsSection({ announcements, authorId, onChanged, setError, setMessage }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [category, setCategory] = useState('information')
+  const [imageFile, setImageFile] = useState(null)
   const [publishing, setPublishing] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [editingImageFile, setEditingImageFile] = useState(null)
 
   const publish = async (e) => {
     e.preventDefault()
     if (!body.trim()) { setError('Écris un message avant de publier.'); return }
-    setError(''); setMessage('')
-    setPublishing(true)
+    setError(''); setMessage(''); setPublishing(true)
+
+    let imageUrl = null
+    if (imageFile) {
+      const result = await uploadPublicFile(imageFile, 'announcements')
+      if (result.error) {
+        setError(`Impossible d'envoyer l'image : ${result.error.message}`)
+        setPublishing(false)
+        return
+      }
+      imageUrl = result.data.url
+    }
 
     const { error } = await supabase.from('announcements').insert({
       title: title.trim() || null,
       body: body.trim(),
+      category,
+      image_url: imageUrl,
+      author_id: authorId || null,
       published: true,
     })
 
     if (error) setError(error.message)
     else {
-      setMessage('Information publiée — visible immédiatement sur la page d’accueil.')
-      setTitle(''); setBody('')
+      setMessage('Annonce publiée — visible immédiatement dans Annonces.')
+      setTitle(''); setBody(''); setImageFile(null); setCategory('information')
       onChanged()
     }
     setPublishing(false)
   }
 
-  const [editing, setEditing] = useState(null)
-
   const remove = async (id) => {
-    if (!window.confirm('Supprimer cette information de l’accueil ?')) return
+    if (!window.confirm('Supprimer cette annonce et ses commentaires ?')) return
     const { error } = await supabase.from('announcements').delete().eq('id', id)
     if (error) setError(error.message)
-    else { setMessage('Information supprimée de l’accueil.'); onChanged() }
+    else { setMessage('Annonce supprimée.'); onChanged() }
   }
 
   const saveEdit = async (a) => {
-    const { error } = await supabase.from('announcements').update({ title: a.title?.trim() || null, body: a.body.trim(), published: !!a.published }).eq('id', a.id)
+    setError('')
+    let imageUrl = a.image_url || null
+    if (editingImageFile) {
+      const result = await uploadPublicFile(editingImageFile, 'announcements')
+      if (result.error) { setError(`Impossible d'envoyer l'image : ${result.error.message}`); return }
+      imageUrl = result.data.url
+    }
+
+    const { error } = await supabase.from('announcements').update({
+      title: a.title?.trim() || null,
+      body: a.body.trim(),
+      category: a.category || 'information',
+      image_url: imageUrl,
+      published: !!a.published,
+    }).eq('id', a.id)
     if (error) setError(error.message)
-    else { setMessage('Information de l’accueil modifiée.'); setEditing(null); onChanged() }
+    else { setMessage('Annonce modifiée.'); setEditing(null); setEditingImageFile(null); onChanged() }
   }
 
   return (
     <div>
       <div className="flex items-center gap-2.5 mb-1">
         <Megaphone size={18} className="text-charo-orange" />
-        <h2 className="font-bold text-lg">Ajouter une information</h2>
+        <h2 className="font-bold text-lg text-ink-700">Publier une annonce</h2>
       </div>
-      <p className="text-sm text-ink-600 mb-5">Publiée instantanément dans la section Annonces de l'accueil.</p>
+      <p className="text-sm text-ink-600 mb-5">Publication instantanée dans la page Annonces, avec commentaires, réponses et réactions.</p>
 
       <form onSubmit={publish} className="card p-6 mb-5 space-y-4">
-        <input
-          value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre (optionnel)"
-          className="w-full rounded-lg bg-ink-800 border border-ink-700 text-sm px-3.5 py-2.5 outline-none focus:border-charo-orange"
-        />
-        <textarea
-          value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="Ton message pour tous les joueurs…"
-          className="w-full rounded-lg bg-ink-800 border border-ink-700 text-sm px-3.5 py-2.5 outline-none focus:border-charo-orange resize-none"
-        />
+        <div className="grid sm:grid-cols-2 gap-3">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre de l'annonce" className="w-full rounded-lg bg-white border border-ink-700 text-sm px-3.5 py-2.5 outline-none focus:border-charo-orange" />
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-lg bg-white border border-ink-700 text-sm px-3.5 py-2.5 outline-none focus:border-charo-orange">
+            <option value="information">📢 Information</option>
+            <option value="match">⚔️ Match</option>
+            <option value="result">🏆 Résultat</option>
+            <option value="event">🔥 Événement</option>
+          </select>
+        </div>
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} placeholder="Ton message pour les joueurs…" className="w-full rounded-lg bg-white border border-ink-700 text-sm px-3.5 py-2.5 outline-none focus:border-charo-orange resize-none" />
+
+        <div className="rounded-2xl border border-dashed border-ink-700 bg-ink-800 p-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <span className="w-10 h-10 rounded-xl bg-charo-orange/10 text-charo-orange flex items-center justify-center"><Paperclip size={18} /></span>
+            <span>
+              <span className="block text-sm font-bold">Ajouter une image</span>
+              <span className="block text-xs text-ink-600 mt-0.5">Téléverse directement depuis ton ordinateur · 10 Mo max</span>
+            </span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+          </label>
+          {imageFile && <p className="text-xs text-charo-orange font-semibold mt-3">Image sélectionnée : {imageFile.name}</p>}
+        </div>
+
         <button type="submit" disabled={publishing} className="btn-primary">
-          {publishing ? 'Publication…' : 'Publier'}
+          {publishing ? 'Téléversement / publication…' : 'Publier l’annonce'}
         </button>
       </form>
 
       {announcements.length > 0 && (
         <div className="card divide-y divide-ink-700">
           {announcements.map((a) => (
-            <div key={a.id} className="p-4 flex items-start justify-between gap-4">
-              <div>
-                {a.title && <p className="font-semibold text-sm">{a.title}</p>}
-                <p className="text-sm text-ink-600">{a.body}</p>
-                <p className="text-[11px] text-ink-600 mt-1">{new Date(a.created_at).toLocaleString('fr-FR')}</p>
-              </div>
-              <button onClick={() => remove(a.id)} className="w-8 h-8 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors shrink-0" aria-label="Supprimer">
-                <Trash2 size={13} />
-              </button>
+            <div key={a.id} className="p-4">
+              {editing?.id === a.id ? (
+                <div className="space-y-3">
+                  <input value={editing.title || ''} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="w-full rounded-lg border border-ink-700 px-3 py-2 text-sm" />
+                  <textarea value={editing.body} onChange={(e) => setEditing({ ...editing, body: e.target.value })} rows={4} className="w-full rounded-lg border border-ink-700 px-3 py-2 text-sm" />
+                  <select value={editing.category || 'information'} onChange={(e) => setEditing({ ...editing, category: e.target.value })} className="w-full rounded-lg border border-ink-700 px-3 py-2 text-sm">
+                    <option value="information">📢 Information</option><option value="match">⚔️ Match</option><option value="result">🏆 Résultat</option><option value="event">🔥 Événement</option>
+                  </select>
+                  <div className="rounded-xl border border-dashed border-ink-700 bg-ink-800 p-3">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold">
+                      <Paperclip size={15} className="text-charo-orange" /> Remplacer l'image
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => setEditingImageFile(e.target.files?.[0] || null)} />
+                    </label>
+                    {editingImageFile && <p className="text-xs text-charo-orange mt-2">Nouvelle image : {editingImageFile.name}</p>}
+                    {editing.image_url && !editingImageFile && <img src={editing.image_url} alt="" className="mt-3 h-28 w-full object-cover rounded-xl" />}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!editing.published} onChange={(e) => setEditing({ ...editing, published: e.target.checked })} /> Publiée</label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => saveEdit(editing)} className="btn-primary !px-4 !py-2 text-xs"><Save size={14} /> Enregistrer</button>
+                    <button type="button" onClick={() => { setEditing(null); setEditingImageFile(null) }} className="btn-outline !px-4 !py-2 text-xs">Annuler</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold uppercase text-charo-orange">{a.category || 'information'}</span>
+                      {!a.published && <span className="text-[10px] rounded-full bg-ink-800 px-2 py-1">Brouillon</span>}
+                    </div>
+                    {a.title && <p className="font-semibold text-sm">{a.title}</p>}
+                    <p className="text-sm text-ink-600 whitespace-pre-wrap">{a.body}</p>
+                    {a.image_url && <img src={a.image_url} alt="" className="mt-3 max-h-40 rounded-xl object-cover" />}
+                    <p className="text-[11px] text-ink-600 mt-1">{new Date(a.created_at).toLocaleString('fr-FR')}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button type="button" onClick={() => { setEditing({ ...a }); setEditingImageFile(null) }} className="w-8 h-8 rounded-lg border border-ink-700 text-ink-600 flex items-center justify-center hover:bg-ink-800" aria-label="Modifier"><Pencil size={13} /></button>
+                    <button type="button" onClick={() => remove(a.id)} className="w-8 h-8 rounded-lg border border-red-200 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white" aria-label="Supprimer"><Trash2 size={13} /></button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -674,3 +758,4 @@ function AnnouncementsSection({ announcements, onChanged, setError, setMessage }
     </div>
   )
 }
+

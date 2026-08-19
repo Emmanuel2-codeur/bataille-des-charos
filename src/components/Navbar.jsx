@@ -1,18 +1,14 @@
 import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Menu, X, Swords, ShieldCheck, UserRound, LogOut } from 'lucide-react'
+import NotificationCenter from './NotificationCenter'
 import logo from '../assets/logo.jpg'
 import { useAuth } from '../lib/AuthContext'
+import { NAV_LINKS } from '../config'
 import { signOut } from '../lib/supabaseClient'
 
-const links = [
-  { to: '/', label: 'Accueil' },
-  { to: '/dashboard', label: 'Live' },
-  { to: '/groupes', label: 'Poules' },
-  { to: '/bracket', label: 'Bracket' },
-  { to: '/classement', label: 'Classement' },
-  { to: '/historique', label: 'Historique' },
-]
+const links = NAV_LINKS
+
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
@@ -51,6 +47,7 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden lg:flex items-center gap-3">
+          {session && <NotificationCenter />}
           {isAdmin && (
             <Link to="/admin" className="btn-outline !px-4 !py-2 text-xs">
               <ShieldCheck size={14} /> Admin
@@ -59,14 +56,14 @@ export default function Navbar() {
 
           {session ? (
             <div className="flex items-center gap-2">
-              <Link to="/profil" className="flex items-center gap-2 rounded-xl border border-ink-200 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:border-charo-orange transition-colors">
+              <Link to="/profil" className="flex items-center gap-2 rounded-xl border border-ink-700 px-3.5 py-2 text-sm font-semibold text-ink-950 hover:border-charo-orange transition-colors">
                 <UserRound size={16} className="text-charo-orange" />
                 {profile?.pseudo || 'Mon profil'}
                 {profile?.status === 'pending' && (
                   <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">En attente</span>
                 )}
               </Link>
-              <button onClick={handleSignOut} className="w-9 h-9 rounded-xl border border-ink-200 flex items-center justify-center text-ink-600 hover:text-red-600 hover:border-red-200 transition-colors" aria-label="Se déconnecter">
+              <button onClick={handleSignOut} className="w-9 h-9 rounded-xl border border-ink-700 flex items-center justify-center text-ink-600 hover:text-red-600 hover:border-red-200 transition-colors" aria-label="Se déconnecter">
                 <LogOut size={15} />
               </button>
             </div>
@@ -90,6 +87,12 @@ export default function Navbar() {
               {l.label}
             </NavLink>
           ))}
+
+          {session && (
+            <div className="pt-2 border-t border-ink-700">
+              <NotificationCenter />
+            </div>
+          )}
 
           {isAdmin && (
             <Link to="/admin" onClick={() => setOpen(false)} className="text-charo-orange font-semibold text-base flex items-center gap-2">

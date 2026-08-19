@@ -5,7 +5,7 @@ import Footer from '../components/Footer'
 import MatchCard from '../components/MatchCard'
 import { supabase } from '../lib/supabaseClient'
 
-const filters = ['Tous', 'À la une', 'Live', 'Terminés', 'À venir']
+const filters = ['Tous', 'À la une', 'En cours', 'Terminés', 'À venir']
 
 function mapMatch(m) {
   return {
@@ -47,13 +47,13 @@ export default function Dashboard() {
   const filtered = matches.filter((m) => {
     if (filter === 'Tous') return true
     if (filter === 'À la une') return m.featured
-    if (filter === 'Live') return m.status === 'live'
+    if (filter === 'En cours') return m.status === 'in_progress'
     if (filter === 'Terminés') return m.status === 'completed'
     if (filter === 'À venir') return m.status === 'scheduled'
     return true
   })
 
-  const liveCount = matches.filter((m) => m.status === 'live').length
+  const liveCount = matches.filter((m) => m.status === 'in_progress').length
 
   return (
     <div className="min-h-screen">
@@ -63,16 +63,16 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-6 mb-10">
             <div>
-              <span className="eyebrow mb-4"><Radio size={12} className="inline -mt-0.5" /> Dashboard Live</span>
-              <h1 className="font-display text-ink-700 text-4xl md:text-5xl">Matchs du jour</h1>
+              <span className="eyebrow mb-4"><Radio size={12} className="inline -mt-0.5" /> Dashboard En cours</span>
+              <h1 className="font-display text-ink-600 text-4xl md:text-5xl">Matchs du jour</h1>
               <p className="text-ink-600 mt-3 max-w-lg">
-                {liveCount} match{liveCount > 1 ? 's' : ''} en direct actuellement. Les scores se synchronisent automatiquement.
+                {liveCount} match{liveCount > 1 ? 's' : ''} en cours actuellement. Les scores se synchronisent automatiquement.
               </p>
             </div>
             <div className="card px-5 py-4 flex items-center gap-3">
               <div className="w-2.5 h-2.5 rounded-full bg-live animate-pulse" />
               <div>
-                <p className="text-sm font-semibold">{liveCount} en direct</p>
+                <p className="text-sm font-semibold">{liveCount} en cours</p>
                 <p className="text-xs text-ink-600">Synchronisation Supabase Realtime</p>
               </div>
             </div>
