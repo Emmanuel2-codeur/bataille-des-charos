@@ -65,6 +65,7 @@ function sectionMeta(status) {
       subtitle: 'Les affrontements actuellement en train de se jouer',
       icon: Radio,
       badge: '● EN COURS',
+      
     },
 
     scheduled: {
@@ -425,7 +426,7 @@ export default function Matchs() {
                                         status ===
                                         'in_progress'
                                           ? 'badge-in-progress'
-                                          : 'border border-ink-700 bg-ink-800 text-white'
+                                          : 'border border-ink-700 bg-ink-800 text-ink-950'
                                       }
                                     `}
                                   >
@@ -462,7 +463,7 @@ export default function Matchs() {
                                 {/* INFOS */}
                                 <div className="mt-6 pt-4 border-t border-ink-700 flex flex-wrap items-center justify-between gap-3">
 
-                                  <span className="inline-flex items-center gap-2 rounded-full bg-ink-800 border border-ink-700 px-3 py-1.5 text-xs font-bold text-white">
+                                  <span className="inline-flex items-center gap-2 rounded-full bg-ink-800 border border-ink-700 px-3 py-1.5 text-xs font-bold text-ink-950">
 
                                     <Swords
                                       size={13}
@@ -491,7 +492,7 @@ export default function Matchs() {
                                     null ||
                                     match.score2 !==
                                       null) && (
-                                    <div className="mt-4 rounded-xl bg-ink-800 border border-ink-700 px-4 py-3 text-center text-sm font-bold text-white">
+                                    <div className="mt-4 rounded-xl bg-ink-800 border border-ink-700 px-4 py-3 text-center text-sm font-bold text-ink-950">
                                       Score en cours :{' '}
                                       {match.score1 ??
                                         0}{' '}
@@ -522,7 +523,7 @@ export default function Matchs() {
                           )}
                         </div>
 
-                        <h3 className="font-bold text-lg text-white">
+                        <h3 className="font-bold text-lg text-ink-950">
                           {status ===
                           'in_progress'
                             ? 'Aucun match en cours'

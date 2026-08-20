@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Mail, ShieldCheck, ChevronDown } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
+import { Mail, ShieldCheck, ChevronDown, Info } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import logo from '../assets/logo.jpg'
 import { signInWithEmail, signInWithGoogle } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
 
 function GoogleGlyph() {
   return (
@@ -17,12 +19,18 @@ function GoogleGlyph() {
 }
 
 export default function Login() {
+  const { session, loading: authLoading } = useAuth()
   const [showEmail, setShowEmail] = useState(false)
   const [email, setEmail] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [googleLoading, setGoogleLoading] = useState(false)
+
+  // Déjà connecté ? Inutile de revoir l'écran de connexion.
+  if (!authLoading && session) {
+    return <Navigate to="/profil" replace />
+  }
 
   const handleGoogle = async () => {
     setGoogleLoading(true)
@@ -65,13 +73,22 @@ export default function Login() {
           />
 
           <div className="text-center">
-            <span className="eyebrow mb-4">Inscription joueur</span>
+            <span className="eyebrow mb-4">Connexion joueur</span>
             <h1 className="font-display text-3xl mb-2 text-ink-950">
-              Rejoindre le tournoi
+              Rejoindre la bataille
             </h1>
-            <p className="text-ink-600 text-sm mb-8 leading-relaxed">
+            <p className="text-ink-600 text-sm mb-4 leading-relaxed">
               Connecte-toi avec ton compte Google. C'est instantané, et ton
-              inscription sera ensuite validée par l'administration de la guilde.
+              accès sera ensuite validé par l'administration de la guilde.
+            </p>
+          </div>
+
+          <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-charo-orange/25 bg-charo-orange/5 p-3.5 text-left">
+            <Info size={15} className="text-charo-orange shrink-0 mt-0.5" />
+            <p className="text-xs text-ink-600 leading-relaxed">
+              Le tournoi est déjà en cours. Les nouvelles demandes restent
+              possibles mais sont soumises à validation selon les places
+              encore disponibles dans les groupes.
             </p>
           </div>
 

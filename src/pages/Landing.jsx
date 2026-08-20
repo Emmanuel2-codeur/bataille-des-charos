@@ -7,9 +7,9 @@ import {
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import StatsBar from '../components/StatsBar'
-import CountdownTimer from '../components/CountdownTimer'
 import logo from '../assets/logo.jpg'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
 import { HOME_ACTIONS } from '../config'
 
 const formatCards = [
@@ -82,7 +82,9 @@ const prizeTiers = [
 ]
 
 export default function Landing() {
+  const { session } = useAuth()
   const [announcements, setAnnouncements] = useState([])
+  const [matchStats, setMatchStats] = useState({ completed: 0, remaining: 0 })
 
   useEffect(() => {
     const load = async () => {
@@ -94,15 +96,25 @@ export default function Landing() {
         .limit(3)
 
       setAnnouncements(announceRows || [])
+
+      const [{ count: completed }, { count: remaining }] = await Promise.all([
+        supabase.from('matches').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
+        supabase.from('matches').select('id', { count: 'exact', head: true }).neq('status', 'completed'),
+      ])
+
+      setMatchStats({ completed: completed || 0, remaining: remaining || 0 })
     }
     load()
 
     const channel = supabase
       .channel?.('landing-live')
       ?.on?.('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, load)
+      ?.on?.('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, load)
       ?.subscribe?.()
     return () => { if (channel) supabase.removeChannel?.(channel) }
   }, [])
+
+  const visibleActions = HOME_ACTIONS.filter((action) => !(action.to === '/connexion' && session))
 
   return (
     <div className="min-h-screen">
@@ -123,13 +135,14 @@ export default function Landing() {
               poules, repêchage, bracket à élimination directe. Scores en cours, arbre du tournoi, un seul champion.
             </p>
             <div className="home-actions-grid mb-10">
-              {HOME_ACTIONS.map((action, index) => {
-                const Icon = index === 0 ? Swords : index === 1 ? Trophy : index === 2 ? Swords : Megaphone
+              {visibleActions.map((action) => {
+                const originalIndex = HOME_ACTIONS.indexOf(action)
+                const Icon = originalIndex === 0 ? Users : originalIndex === 1 ? Trophy : originalIndex === 2 ? Swords : Megaphone
                 const variant = action.variant === 'primary' ? 'home-action-primary' : action.variant === 'dark' ? 'home-action-dark' : ''
                 return (
                   <Link key={action.to} to={action.to} className={`home-action ${variant}`}>
-                    <Icon size={18} strokeWidth={index === 0 || index === 2 ? 2.5 : 2} />
-                    <span>{action.label}</span>
+                    <Icon size={18} strokeWidth={originalIndex === 0 || originalIndex === 2 ? 2.5 : 2} />
+                    <span>{action.to === '/connexion' ? 'Se connecter' : action.label}</span>
                   </Link>
                 )
               })}
@@ -141,8 +154,16 @@ export default function Landing() {
             </div>
 
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-ink-600 mb-3">Coup d'envoi dans</p>
-              <CountdownTimer targetDate="2026-08-17T00:00:00" />
+              <p className="text-xs uppercase tracking-[0.2em] text-ink-600 mb-3">Statut du tournoi</p>
+              <div className="inline-flex items-center gap-2.5 rounded-2xl border border-live/25 bg-live/5 px-4 py-3">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-live opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-live" />
+                </span>
+                <span className="text-sm font-bold text-charo-orange">
+                  Tournoi en cours — {matchStats.completed} matchs joués · {matchStats.remaining} à venir
+                </span>
+              </div>
             </div>
           </div>
 
@@ -155,7 +176,8 @@ export default function Landing() {
                 className="w-full aspect-square object-cover rounded-xl"
               />
               <div className="absolute top-6 left-6 badge-open">
-                <span className="w-1.5 h-1.5 rounded-full bg-live animate-ping" /> Inscriptions ouvertes
+                <span className="w-1.5 h-1.5 rounded-full bg-live animate-ping" />
+                {session ? 'Tournoi en cours' : 'Soyez Méchant'}
               </div>
             </div>
           </div>
@@ -402,11 +424,20 @@ export default function Landing() {
           <div className="rounded-3xl bg-charo-gradient p-10 md:p-16 flex flex-col lg:flex-row items-center justify-between gap-8 relative overflow-hidden">
             <Target size={220} className="absolute -right-10 -bottom-10 text-ink-950/10" />
             <div className="relative">
-              <h2 className="font-display text-4xl md:text-5xl text-ink-950 mb-3">Prêt à entrer dans l'arène ?</h2>
-              <p className="text-ink-950/70 max-w-md">Connecte-toi avec Google, valide ton profil et rejoins l'un des 10 groupes de la Bataille des Charos.</p>
+              <h2 className="font-display text-4xl md:text-5xl text-ink-950 mb-3">
+                {session ? 'Suis la bataille en direct' : "Prêt à entrer dans l'arène ?"}
+              </h2>
+              <p className="text-ink-950/70 max-w-md">
+                {session
+                  ? 'Consulte le classement en temps réel et les prochains matchs de ton groupe.'
+                  : 'Connecte-toi avec Google, valide ton profil et rejoins l\'un des 10 groupes de la Bataille des Charos.'}
+              </p>
             </div>
-            <Link to="/connexion" className="relative inline-flex items-center gap-2 rounded-xl bg-ink-950 text-white font-bold px-7 py-4 hover:bg-ink-900 transition-colors shrink-0">
-              <Swords size={18} /> Je m'inscris
+            <Link
+              to={session ? '/classement' : '/connexion'}
+              className="relative inline-flex items-center gap-2 rounded-xl bg-ink-950 text-white font-bold px-7 py-4 hover:bg-ink-900 transition-colors shrink-0"
+            >
+              <Swords size={18} /> {session ? 'Voir le classement' : 'Se connecter'}
             </Link>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Menu, X, Swords, ShieldCheck, UserRound, LogOut } from 'lucide-react'
+import { Menu, X, Swords, ShieldCheck, UserRound, LogOut, Users } from 'lucide-react'
 import NotificationCenter from './NotificationCenter'
 import logo from '../assets/logo.jpg'
 import { useAuth } from '../lib/AuthContext'
@@ -92,9 +92,9 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <Link to="/connexion" className="btn-primary !px-5 !py-2.5 text-sm">
-              <Swords size={16} strokeWidth={2.5} />
-              Rejoindre le tournoi
+            <Link to="/connexion" className="btn-outline !px-5 !py-2.5 text-sm">
+              <Users size={16} strokeWidth={2.5} />
+              Se connecter
             </Link>
           )}
         </div>
@@ -134,8 +134,8 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <Link to="/connexion" onClick={() => setOpen(false)} className="btn-primary w-full mt-2">
-              <Swords size={16} /> Rejoindre le tournoi
+            <Link to="/connexion" onClick={() => setOpen(false)} className="btn-outline w-full mt-2">
+              <Users size={16} strokeWidth={2.5} /> Se connecter
             </Link>
           )}
         </div>
