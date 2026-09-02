@@ -43,6 +43,7 @@ function iconFor(type) {
   if (type === 'comment') return '💬'
   if (type === 'reaction') return '❤️'
   if (type === 'approval') return '🎉'
+  if (type === 'security_alert') return '🚨'
 
   return '📢'
 }

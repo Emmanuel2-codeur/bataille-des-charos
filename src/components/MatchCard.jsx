@@ -1,4 +1,5 @@
 import { Crosshair, Target, Clock } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 function PlayerRow({ name, score, damage, isWinner }) {
   const initials = name.slice(0, 2).toUpperCase()
@@ -31,7 +32,12 @@ export default function MatchCard({ match }) {
   const winner2 = status === 'completed' && score2 > score1
 
   return (
-    <div className="card p-5 relative overflow-hidden hover:border-charo-orange/50 transition-colors">
+    <motion.div
+      className="card p-5 relative overflow-hidden hover:border-charo-orange/50 hover:shadow-glow transition-colors"
+      whileHover={{ y: -5, scale: 1.012 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+    >
       {status === 'in_progress' && <div className="absolute inset-x-0 top-0 h-0.5 bg-live animate-pulse" />}
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold text-ink-600 uppercase tracking-wide">{roundLabel}</span>
@@ -55,6 +61,6 @@ export default function MatchCard({ match }) {
         {matchType === 'onetap' ? <Crosshair size={13} className="text-charo-orange" /> : <Target size={13} className="text-charo-orange" />}
         {matchType === 'onetap' ? 'One Tap · Headshot Only' : 'Spam · Bodyshot'}
       </div>
-    </div>
+    </motion.div>
   )
 }

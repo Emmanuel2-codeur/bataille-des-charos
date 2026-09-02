@@ -4,6 +4,39 @@
 
 html { scroll-behavior: smooth; }
 
+/* ================= ANIMATIONS GLOBALES "VIVANTES" ================= */
+@keyframes card-reveal-in {
+  from { opacity: 0; transform: translateY(26px) scale(0.94) rotate(-1.2deg); }
+  60%  { opacity: 1; transform: translateY(-4px) scale(1.015) rotate(0.3deg); }
+  to   { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+}
+.card-reveal {
+  animation: card-reveal-in 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-reveal { animation: none; }
+}
+
+/* Micro-interactions boutons : appui "pressé" + relâchement élastique */
+.btn-primary, .btn-outline {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, opacity 0.2s ease;
+}
+.btn-primary:hover, .btn-outline:hover { transform: translateY(-2px); }
+.btn-primary:active, .btn-outline:active { transform: translateY(0) scale(0.96); }
+
+/* Tuiles / lignes de tableau : fondu séquencé plus marqué */
+tr.card-reveal { animation-name: card-reveal-in; }
+
+@keyframes shimmer-sweep {
+  from { background-position: -400px 0; }
+  to   { background-position: 400px 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 37%, rgba(0,0,0,0.04) 63%);
+  background-size: 400px 100%;
+  animation: shimmer-sweep 1.4s ease-in-out infinite;
+}
+
 body {
   @apply bg-white text-ink-950 font-body antialiased;
   background-image: none;

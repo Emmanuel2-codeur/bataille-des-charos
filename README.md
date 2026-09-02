@@ -78,6 +78,63 @@ la page de connexion et le favicon (`public/logo.jpg`).
 
 ## Notes
 
+## Mise à jour — UI/UX, sécurité & admin intelligent (dernière livraison)
+
+### 1. Nouvelles dépendances
+`framer-motion` (animations/transitions) et `recharts` (graphiques du dashboard admin) ont été ajoutées.
+Après avoir récupéré ce zip : `npm install` avant `npm run dev`.
+
+### 2. Migration Supabase à exécuter
+Dans Supabase → SQL Editor, exécuter **une fois**, après toutes les migrations existantes :
+
+```
+sql/migration_super_admin_security.sql
+```
+
+⚠️ Avant de l'exécuter : ouvrir le fichier et remplacer l'adresse email dans la
+section « 2. Fonctions de rôle » par l'email du compte qui doit devenir
+**super-admin** (celui qui recevra les alertes de sécurité). Un super-admin
+reste aussi admin.
+
+Cette migration ajoute :
+- le rôle `super_admin` ;
+- un **journal d'audit automatique** (`audit_log`) : chaque création / modification /
+  suppression sur `profiles`, `matches`, `groups`, `announcements` est enregistrée
+  avec l'identité exacte de l'auteur — visible par tous les admins dans
+  **Admin → Journal** ;
+- la **détection d'anomalies automatique** (`security_alerts`) : rafale d'actions
+  sur un même compte, suppressions en série, tentative d'élévation de rôle,
+  activité admin entre minuit et 5h. Chaque anomalie génère une notification
+  in-app pour le(s) super-admin(s), visible dans **Admin → Sécurité** (onglet
+  réservé au super-admin) et dans la cloche de notifications.
+
+### 3. (Optionnel) Alertes de sécurité par email
+Les alertes sont visibles in-app sans rien configurer de plus. Pour recevoir
+aussi un **email** à chaque alerte :
+1. Déployer `supabase/functions/send-security-alert` (`supabase functions deploy send-security-alert`).
+2. Configurer les secrets de la fonction : `RESEND_API_KEY` (clé [Resend](https://resend.com)),
+   `ALERT_EMAIL_FROM`, `SECURITY_ALERT_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`.
+3. Créer un Database Webhook Supabase : table `security_alerts`, événement `INSERT`,
+   URL `https://<projet>.supabase.co/functions/v1/send-security-alert`, en-tête
+   `x-alert-secret: <SECURITY_ALERT_WEBHOOK_SECRET>` — même principe que le
+   webhook déjà utilisé pour les notifications push.
+
+### 4. Panneau admin restructuré
+`/admin` est maintenant organisé en onglets : **Vue d'ensemble** (dashboard avec
+statistiques et graphiques), **Inscriptions**, **Joueurs & poules**, **Matchs**,
+**Annonces**, **Journal**, et **Sécurité** (super-admin uniquement).
+
+La programmation d'un match dispose maintenant d'une recherche instantanée de
+joueur (au lieu d'une liste déroulante), qui affiche automatiquement sa poule ;
+les derniers réglages utilisés (heure, règle, phase) sont mémorisés d'un match
+à l'autre pour aller plus vite.
+
+### 5. UI/UX
+- Nouveau splash screen animé au premier chargement de session.
+- Transitions douces entre les pages (fondu + léger glissement).
+- Cartes de match, poules et classement qui apparaissent en cascade et réagissent
+  au survol (effet "lift" façon Pinterest).
+
 - Les données affichées sur `/dashboard`, `/groupes`, `/bracket` et `/admin` sont
   actuellement des données de démonstration (mock) : branchez `src/lib/supabaseClient.js`
   sur vos tables (`matches`, `profiles`, `groups`) pour passer en production.

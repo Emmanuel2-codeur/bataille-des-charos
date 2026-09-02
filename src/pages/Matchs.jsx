@@ -361,7 +361,7 @@ export default function Matchs() {
                       <div className="grid gap-6 md:grid-cols-2">
 
                         {sectionMatches.map(
-                          (match) => {
+                          (match, matchIndex) => {
 
                             const type =
                               typeMeta[
@@ -377,6 +377,7 @@ export default function Matchs() {
                               <article
                                 key={match.id}
                                 className={`
+                                  card-reveal
                                   relative overflow-hidden
                                   rounded-2xl
                                   border border-ink-700
@@ -384,7 +385,10 @@ export default function Matchs() {
                                   p-6
                                   shadow-card
                                   transition-all
-                                  hover:-translate-y-0.5
+                                  duration-300
+                                  hover:-translate-y-1.5
+                                  hover:scale-[1.012]
+                                  hover:shadow-glow
                                   hover:border-charo-orange/50
                                   ${
                                     status ===
@@ -393,6 +397,7 @@ export default function Matchs() {
                                       : ''
                                   }
                                 `}
+                                style={{ animationDelay: `${Math.min(matchIndex, 8) * 60}ms` }}
                               >
 
                                 {/* BARRE EN COURS */}

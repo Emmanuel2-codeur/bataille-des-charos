@@ -255,7 +255,8 @@ export default function Classement() {
                     players.map((player, index) => (
                       <tr
                         key={player.id}
-                        className="hover:bg-ink-800/70 transition-colors"
+                        className="card-reveal hover:bg-ink-800/70 transition-colors"
+                        style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
                       >
 
                         {/* Rang */}

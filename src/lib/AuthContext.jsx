@@ -54,11 +54,12 @@ export function AuthProvider({ children }) {
     if (session?.user?.id) return fetchProfile(session.user.id)
   }, [session, fetchProfile])
 
-  const isAdmin = profile?.role === 'admin'
+  const isSuperAdmin = profile?.role === 'super_admin'
+  const isAdmin = profile?.role === 'admin' || isSuperAdmin
   const isApproved = profile?.status === 'approved'
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, isAdmin, isApproved, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, isAdmin, isSuperAdmin, isApproved, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

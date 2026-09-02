@@ -60,8 +60,10 @@ export default function Groupes() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {groups.map((g) => (
-                <GroupTable key={g.id} name={g.name} players={playersByGroup[g.id] || []} />
+              {groups.map((g, i) => (
+                <div key={g.id} className="card-reveal" style={{ animationDelay: `${Math.min(i, 10) * 50}ms` }}>
+                  <GroupTable name={g.name} players={playersByGroup[g.id] || []} />
+                </div>
               ))}
               {groups.length === 0 && (
                 <p className="text-ink-600 col-span-full text-center py-16">

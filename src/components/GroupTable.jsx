@@ -2,7 +2,7 @@ import { Flame } from 'lucide-react'
 
 export default function GroupTable({ name, players = [] }) {
   return (
-    <div className="card p-5">
+    <div className="card p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-glow hover:border-charo-orange/40">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-charo-gradient flex items-center justify-center font-display text-ink-950 text-sm">

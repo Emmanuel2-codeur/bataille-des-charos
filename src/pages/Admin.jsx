@@ -1,13 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldAlert, Check, X, Star, Clock, Save, RefreshCw, Mail,
   UserPlus, CalendarPlus, ClipboardCheck, Megaphone, Trash2, Pencil, Trophy, Paperclip,
+  LayoutDashboard, Users, Swords, History,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import { uploadPublicFile } from '../lib/storage'
+import AdminTabs from '../components/AdminTabs'
+import PlayerCombobox from '../components/PlayerCombobox'
+import DashboardSection from '../components/admin/DashboardSection'
+import AuditLogSection from '../components/admin/AuditLogSection'
+import SecurityAlertsSection from '../components/admin/SecurityAlertsSection'
+
+const LAST_MATCH_SETTINGS_KEY = 'charos_admin_last_match_settings'
 
 const MATCH_TYPES = [
   { value: 'onetap', label: 'One Tap (Aller)' },
@@ -23,16 +32,26 @@ const PHASES = [
 ]
 
 export default function Admin() {
-  const { profile } = useAuth()
+  const { profile, isSuperAdmin } = useAuth()
   const [pending, setPending] = useState([])
   const [groups, setGroups] = useState([])
   const [players, setPlayers] = useState([]) // joueurs approuvés, pour les selects
   const [matches, setMatches] = useState([])
   const [announcements, setAnnouncements] = useState([])
+  const [auditLog, setAuditLog] = useState([])
+  const [securityAlerts, setSecurityAlerts] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get('tab') || 'dashboard')
+  const changeTab = (id) => {
+    setTab(id)
+    const url = new URL(window.location)
+    url.searchParams.set('tab', id)
+    window.history.replaceState({}, '', url)
+  }
 
   const loadAll = async () => {
     if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
@@ -43,13 +62,7 @@ export default function Admin() {
     setLoading(true)
     setError('')
 
-    const [
-      { data: pendingRows, error: pendingError },
-      { data: groupRows, error: groupsError },
-      { data: playerRows, error: playersError },
-      { data: matchRows, error: matchesError },
-      { data: announceRows, error: announceError },
-    ] = await Promise.all([
+    const queries = [
       supabase.rpc('admin_list_pending_players'),
       supabase.from('groups').select('id, name').order('name', { ascending: true }),
       supabase.from('profiles').select('id, pseudo, ff_uid, group_id, total_points, total_kills, total_damage, wins, losses, is_qualified, qualification_seed').eq('status', 'approved').order('pseudo'),
@@ -60,9 +73,24 @@ export default function Admin() {
         )
         .order('scheduled_at', { ascending: true, nullsFirst: false }),
       supabase.from('announcements').select('id, title, body, published, category, image_url, author_id, created_at').order('created_at', { ascending: false }),
-    ])
+      supabase.from('audit_log').select('id, actor_pseudo, action, entity_type, entity_label, created_at').order('created_at', { ascending: false }).limit(200),
+    ]
+    if (isSuperAdmin) {
+      queries.push(supabase.from('security_alerts').select('*').order('created_at', { ascending: false }).limit(100))
+    }
 
-    const firstError = pendingError || groupsError || playersError || matchesError || announceError
+    const results = await Promise.all(queries)
+    const [
+      { data: pendingRows, error: pendingError },
+      { data: groupRows, error: groupsError },
+      { data: playerRows, error: playersError },
+      { data: matchRows, error: matchesError },
+      { data: announceRows, error: announceError },
+      { data: auditRows, error: auditError },
+    ] = results
+    const { data: alertRows, error: alertError } = isSuperAdmin ? results[6] : { data: [], error: null }
+
+    const firstError = pendingError || groupsError || playersError || matchesError || announceError || auditError || alertError
     if (firstError) {
       setError(firstError.message)
     } else {
@@ -75,11 +103,28 @@ export default function Admin() {
         damage1: Number(m.damage1 || 0), damage2: Number(m.damage2 || 0),
       })))
       setAnnouncements(announceRows || [])
+      setAuditLog(auditRows || [])
+      setSecurityAlerts(alertRows || [])
     }
     setLoading(false)
   }
 
   useEffect(() => { loadAll() }, [])
+
+  const unresolvedAlerts = securityAlerts.filter((a) => !a.resolved).length
+
+  const TABS = useMemo(() => {
+    const list = [
+      { id: 'dashboard', label: 'Vue d’ensemble', icon: <LayoutDashboard size={15} /> },
+      { id: 'inscriptions', label: 'Inscriptions', icon: <UserPlus size={15} />, badge: pending.length },
+      { id: 'joueurs', label: 'Joueurs & poules', icon: <Users size={15} /> },
+      { id: 'matchs', label: 'Matchs', icon: <Swords size={15} />, badge: matches.filter(m => m.status !== 'completed').length },
+      { id: 'annonces', label: 'Annonces', icon: <Megaphone size={15} /> },
+      { id: 'journal', label: 'Journal', icon: <History size={15} /> },
+    ]
+    if (isSuperAdmin) list.push({ id: 'securite', label: 'Sécurité', icon: <ShieldAlert size={15} />, badge: unresolvedAlerts })
+    return list
+  }, [pending.length, matches, isSuperAdmin, unresolvedAlerts])
 
   return (
     <div className="min-h-screen">
@@ -87,9 +132,9 @@ export default function Admin() {
 
       <section className="py-14 lg:py-20">
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
-          <div className="flex flex-wrap items-end justify-between gap-5 mb-10">
+          <div className="flex flex-wrap items-end justify-between gap-5 mb-8">
             <div>
-              <span className="eyebrow mb-4"><ShieldAlert size={12} /> Espace administration</span>
+              <span className="eyebrow mb-4"><ShieldAlert size={12} /> Espace administration{isSuperAdmin ? ' · Super-admin' : ''}</span>
               <h1 className="font-display text-4xl md:text-5xl mb-2 text-ink-700">Panneau de contrôle</h1>
               <p className="text-ink-600 max-w-xl">
                 Chaque action ici met à jour le site en direct : joueur validé → visible dans son groupe et
@@ -104,40 +149,71 @@ export default function Admin() {
           {error && <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           {message && <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{message}</div>}
 
-          <PendingSection
-            pending={pending} groups={groups}
-            onChanged={loadAll} setError={setError} setMessage={setMessage}
-          />
+          <AdminTabs tabs={TABS} active={tab} onChange={changeTab} />
 
-          <PlayerManagementSection
-            players={players} groups={groups}
-            onChanged={loadAll} setError={setError} setMessage={setMessage}
-          />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 14, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {tab === 'dashboard' && (
+                <DashboardSection players={players} matches={matches} groups={groups} pendingCount={pending.length} recentActivity={auditLog.slice(0, 8)} />
+              )}
 
-          <QualificationSection
-            onChanged={loadAll} setError={setError} setMessage={setMessage}
-          />
+              {tab === 'inscriptions' && (
+                <PendingSection
+                  pending={pending} groups={groups}
+                  onChanged={loadAll} setError={setError} setMessage={setMessage}
+                />
+              )}
 
-          <ScheduleMatchSection
-            players={players} groups={groups}
-            onCreated={loadAll} setError={setError} setMessage={setMessage}
-          />
+              {tab === 'joueurs' && (
+                <>
+                  <PlayerManagementSection
+                    players={players} groups={groups}
+                    onChanged={loadAll} setError={setError} setMessage={setMessage}
+                  />
+                  <QualificationSection
+                    onChanged={loadAll} setError={setError} setMessage={setMessage}
+                  />
+                </>
+              )}
 
-          <ValidateScoreSection
-            matches={matches}
-            onSaved={loadAll} setError={setError} setMessage={setMessage}
-          />
+              {tab === 'matchs' && (
+                <>
+                  <ScheduleMatchSection
+                    players={players} groups={groups}
+                    onCreated={loadAll} setError={setError} setMessage={setMessage}
+                  />
+                  <ValidateScoreSection
+                    matches={matches}
+                    onSaved={loadAll} setError={setError} setMessage={setMessage}
+                  />
+                  <MatchManagementSection
+                    matches={matches} players={players} groups={groups}
+                    onChanged={loadAll} setError={setError} setMessage={setMessage}
+                  />
+                </>
+              )}
 
-          <MatchManagementSection
-            matches={matches} players={players} groups={groups}
-            onChanged={loadAll} setError={setError} setMessage={setMessage}
-          />
+              {tab === 'annonces' && (
+                <AnnouncementsSection
+                  announcements={announcements}
+                  authorId={profile?.id}
+                  onChanged={loadAll} setError={setError} setMessage={setMessage}
+                />
+              )}
 
-          <AnnouncementsSection
-            announcements={announcements}
-            authorId={profile?.id}
-            onChanged={loadAll} setError={setError} setMessage={setMessage}
-          />
+              {tab === 'journal' && <AuditLogSection entries={auditLog} />}
+
+              {tab === 'securite' && isSuperAdmin && (
+                <SecurityAlertsSection alerts={securityAlerts} onChanged={loadAll} setMessage={setMessage} setError={setError} />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </section>
 
@@ -323,14 +399,51 @@ function QualificationSection({ onChanged, setError, setMessage }) {
 /* ============================================================================
    4. PROGRAMMER UN MATCH
    ========================================================================= */
+function loadLastMatchSettings() {
+  try {
+    const raw = localStorage.getItem(LAST_MATCH_SETTINGS_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
 function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage }) {
+  const remembered = loadLastMatchSettings()
   const [form, setForm] = useState({
-    player1_id: '', player2_id: '', scheduled_at: '', match_type: 'onetap',
-    leg: 'aller', phase: 'poule', group_id: '',
+    player1_id: '', player2_id: '', scheduled_at: '',
+    match_type: remembered?.match_type || 'onetap',
+    leg: remembered?.leg || 'aller',
+    phase: remembered?.phase || 'poule',
+    group_id: '',
+    group_auto: true, // le groupe suit automatiquement le joueur 1 tant que l'admin n'a rien choisi lui-même
   })
   const [saving, setSaving] = useState(false)
+  const [rememberHour, setRememberHour] = useState(remembered?.hour || '')
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
+
+  // Détection automatique de la poule dès que le joueur 1 est choisi
+  const setPlayer1 = (id) => {
+    const player = players.find((p) => p.id === id)
+    set({
+      player1_id: id,
+      group_id: form.group_auto && player?.group_id ? player.group_id : form.group_id,
+    })
+  }
+
+  // Pré-remplit l'heure avec la dernière utilisée, à la date choisie
+  const applyRememberedHour = (dateOnly) => {
+    if (!dateOnly || !rememberHour) return dateOnly
+    return `${dateOnly.slice(0, 10)}T${rememberHour}`
+  }
+
+  const onDateChange = (raw) => {
+    if (raw && raw.length === 10) { // l'utilisateur n'a saisi que la date (widget natif) -> on complète l'heure mémorisée
+      set({ scheduled_at: applyRememberedHour(raw) || raw })
+    } else {
+      set({ scheduled_at: raw })
+      if (raw?.length >= 16) setRememberHour(raw.slice(11, 16))
+    }
+  }
 
   const createMatch = async (e) => {
     e.preventDefault()
@@ -355,7 +468,12 @@ function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage
     if (error) setError(error.message)
     else {
       setMessage('Match programmé. Il passera en cours tout seul à l’heure prévue.')
-      set({ player1_id: '', player2_id: '', scheduled_at: '' })
+      // On mémorise les réglages (hors joueurs et date) pour préremplir le prochain match
+      const hour = form.scheduled_at?.length >= 16 ? form.scheduled_at.slice(11, 16) : rememberHour
+      localStorage.setItem(LAST_MATCH_SETTINGS_KEY, JSON.stringify({
+        match_type: form.match_type, leg: form.leg, phase: form.phase, hour,
+      }))
+      set({ player1_id: '', player2_id: '', group_id: '', group_auto: true })
       onCreated()
     }
     setSaving(false)
@@ -368,30 +486,19 @@ function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage
         <h2 className="font-bold text-lg text-ink-700">Programmer un match</h2>
       </div>
       <p className="text-sm text-ink-600 mb-5">
-        Dès l'heure programmée atteinte, le match passe automatiquement en cours sur le Dashboard.
+        Recherche un joueur par son pseudo, sa poule s'affiche automatiquement. Les derniers réglages
+        (heure, règle, phase) sont mémorisés pour aller plus vite au prochain match.
       </p>
 
       <form onSubmit={createMatch} className="card p-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <label className="block">
-          <span className="block text-xs font-semibold text-ink-600 mb-1.5">Joueur 1</span>
-          <select value={form.player1_id} onChange={(e) => set({ player1_id: e.target.value })} className="w-full rounded-lg bg-ink-800 border border-ink-700 text-sm px-3 py-2.5 outline-none focus:border-charo-orange">
-            <option value="">Sélectionner…</option>
-            {players.map((p) => <option key={p.id} value={p.id}>{p.pseudo}</option>)}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="block text-xs font-semibold text-ink-600 mb-1.5">Joueur 2</span>
-          <select value={form.player2_id} onChange={(e) => set({ player2_id: e.target.value })} className="w-full rounded-lg bg-ink-800 border border-ink-700 text-sm px-3 py-2.5 outline-none focus:border-charo-orange">
-            <option value="">Sélectionner…</option>
-            {players.map((p) => <option key={p.id} value={p.id}>{p.pseudo}</option>)}
-          </select>
-        </label>
+        <PlayerCombobox label="Joueur 1" players={players} groups={groups} value={form.player1_id} excludeId={form.player2_id} onChange={setPlayer1} />
+        <PlayerCombobox label="Joueur 2" players={players} groups={groups} value={form.player2_id} excludeId={form.player1_id} onChange={(id) => set({ player2_id: id })} />
 
         <label className="block">
           <span className="block text-xs font-semibold text-ink-600 mb-1.5">Date & heure</span>
-          <input type="datetime-local" value={form.scheduled_at} onChange={(e) => set({ scheduled_at: e.target.value })}
+          <input type="datetime-local" value={form.scheduled_at} onChange={(e) => onDateChange(e.target.value)}
             className="w-full rounded-lg bg-ink-800 border border-ink-700 text-sm px-3 py-2.5 outline-none focus:border-charo-orange" />
+          {rememberHour && <span className="block text-[10px] text-ink-600 mt-1">Heure mémorisée : {rememberHour}</span>}
         </label>
 
         <label className="block">
@@ -403,8 +510,14 @@ function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage
 
         {form.phase === 'poule' ? (
           <label className="block">
-            <span className="block text-xs font-semibold text-ink-600 mb-1.5">Groupe</span>
-            <select value={form.group_id} onChange={(e) => set({ group_id: e.target.value })} className="w-full rounded-lg bg-ink-800 border border-ink-700 text-sm px-3 py-2.5 outline-none focus:border-charo-orange">
+            <span className="flex items-center justify-between text-xs font-semibold text-ink-600 mb-1.5">
+              Groupe {form.group_auto && form.group_id && <span className="text-charo-orange normal-case font-bold">Auto ✓</span>}
+            </span>
+            <select
+              value={form.group_id}
+              onChange={(e) => set({ group_id: e.target.value, group_auto: false })}
+              className="w-full rounded-lg bg-ink-800 border border-ink-700 text-sm px-3 py-2.5 outline-none focus:border-charo-orange"
+            >
               <option value="">—</option>
               {groups.map((g) => <option key={g.id} value={g.id}>Groupe {g.name}</option>)}
             </select>

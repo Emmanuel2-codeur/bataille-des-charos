@@ -208,14 +208,15 @@ export default function Landing() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {formatCards.map(({ icon: Icon, title, text, highlight }) => (
+            {formatCards.map(({ icon: Icon, title, text, highlight }, i) => (
               <div
                 key={title}
-                className={`rounded-2xl p-6 border transition-transform hover:-translate-y-1 ${
+                className={`card-reveal rounded-2xl p-6 border transition-all duration-300 hover:-translate-y-1.5 hover:shadow-glow ${
                   highlight
                     ? 'bg-ink-950 border-ink-950 text-white'
                     : 'bg-white border-ink-950/10 text-ink-950'
                 }`}
+                style={{ animationDelay: `${i * 70}ms` }}
               >
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-5 ${
                   highlight ? 'bg-charo-orange text-ink-950' : 'bg-charo-orange/10 text-charo-orange'
