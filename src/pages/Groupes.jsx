@@ -50,8 +50,8 @@ export default function Groupes() {
           <span className="eyebrow mb-4">Phase de qualifications</span>
           <h1 className="font-display text-4xl md:text-5xl mb-4 text-ink-900">Les 10 groupes</h1>
           <p className="text-ink-600 max-w-xl mb-12">
-            40 joueurs, 10 groupes de 4, championnat interne. Le 1er de chaque groupe est qualifié d'office ;
-            les 12 meilleurs joueurs restants complètent le Top 32 après avoir retenu les 2 premiers de chaque groupe.
+            40 joueurs, 10 groupes de 4, championnat interne. Les résultats construisent le classement ;
+            la sélection des 32 finalistes est ensuite effectuée manuellement par l’administration parmi les joueurs approuvés.
           </p>
 
           {loading ? (

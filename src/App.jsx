@@ -12,6 +12,7 @@ import Historique from './pages/Historique'
 import Profil from './pages/Profil'
 import AdminRoute from './components/AdminRoute'
 import Matchs from './pages/Matchs'
+import Finalistes from './pages/Finalistes'
 import Annonces from './pages/Annonces'
 import BackToTop from './components/BackToTop'
 import SplashScreen from './components/SplashScreen'
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/dashboard" element={<Navigate to="/matchs" replace />} />
           <Route path="/groupes" element={<PageTransition><Groupes /></PageTransition>} />
           <Route path="/bracket" element={<PageTransition><Bracket /></PageTransition>} />
+          <Route path="/finalistes" element={<PageTransition><Finalistes /></PageTransition>} />
           <Route path="/reglement" element={<PageTransition><Reglement /></PageTransition>} />
           <Route path="/classement" element={<PageTransition><Classement /></PageTransition>} />
           <Route path="/historique" element={<PageTransition><Historique /></PageTransition>} />

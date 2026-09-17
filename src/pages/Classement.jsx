@@ -332,7 +332,7 @@ export default function Classement() {
                           {player.is_qualified ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-charo-orange/10 border border-charo-orange/30 text-charo-orange px-2.5 py-1 text-xs font-bold">
                               <Medal size={12} />
-                              Top 16
+                              Top 32
                             </span>
                           ) : (
                             <span className="text-xs text-ink-600">

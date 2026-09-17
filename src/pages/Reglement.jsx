@@ -9,15 +9,15 @@ const sections = [
     items: [
       '40 joueurs répartis en 10 groupes (A à J) de 4 joueurs.',
       'Phase de poules en championnat : chaque joueur affronte les 3 autres de son groupe.',
-      'Phases finales : élimination directe pour les 32 qualifiés (huitièmes, quarts, demies, finale).',
+      'Phases finales : élimination directe pour les 32 finalistes choisis par l’administration (32èmes, 16èmes, quarts, demies, finale).',
     ],
   },
   {
     icon: ListOrdered,
     title: '2. Système de qualification',
     items: [
-      "Les 10 premiers de chaque groupe sont qualifiés d'office.",
-      'Les 2 premiers de chaque groupe sont qualifiés (20 joueurs), puis les 12 meilleurs joueurs restants sont repêchés selon les points, les dégâts puis les kills pour former 32 qualifiés.',
+      'Les résultats de poules alimentent le classement général.',
+      'Les 32 finalistes sont choisis manuellement par l’administration parmi les joueurs approuvés. Aucun tirage ni repêchage automatique n’est effectué pour la phase finale.',
     ],
   },
   {
@@ -33,7 +33,7 @@ const sections = [
     icon: Trophy,
     title: '4. Déroulement des phases finales',
     items: [
-      'Seizièmes de finale à partir des 32 qualifiés.',
+      '32èmes de finale à partir des 32 joueurs choisis par l’administration.',
       'Progression par élimination directe jusqu\'à la grande finale.',
       'Navigation de l\'arbre par swipe horizontal sur mobile.',
     ],

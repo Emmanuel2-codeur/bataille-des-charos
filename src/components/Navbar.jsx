@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { Menu, X, Swords, ShieldCheck, UserRound, LogOut, Users } from 'lucide-react'
 import NotificationCenter from './NotificationCenter'
+import BackButton from './BackButton'
 import logo from '../assets/logo.jpg'
 import { useAuth } from '../lib/AuthContext'
 import { NAV_LINKS } from '../config'
@@ -13,6 +14,7 @@ const links = NAV_LINKS
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const { session, profile, isAdmin } = useAuth()
+  const location = useLocation()
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -46,6 +48,8 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-ink-700 bg-white/95 backdrop-blur-md relative">
       <div className="max-w-7xl mx-auto px-5 lg:px-8 h-20 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+        {location.pathname !== '/' && <BackButton className="back-button-nav" />}
         <Link to="/" className="flex items-center gap-3">
           <img src={logo} alt="Guilde MÉCHANTCHARO" className="w-8 h-8 rounded-full object-cover ring-2 ring-charo-orange/60" />
           <div className="leading-none">
@@ -53,6 +57,7 @@ export default function Navbar() {
             <p className="text-[10px] uppercase tracking-[0.25em] text-ink-600 text-opacity-80">Guilde Méchantcharo</p>
           </div>
         </Link>
+        </div>
 
         <nav className="hidden lg:flex items-center gap-8">
           {links.map((l) => (

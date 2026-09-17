@@ -171,3 +171,8 @@ et les comptes admin.
 - **Classement** : trié par kills puis dégâts (colonne `total_kills`, maintenue automatiquement).
 - Un match programmé passe seul en "Live" à l'heure prévue (pg_cron, côté serveur — fonctionne
   même si personne n'a le site ouvert), et un match validé par l'admin quitte le Live pour l'Historique.
+
+
+## Phase finale manuelle — 16 finalistes
+
+Après les migrations existantes, exécuter `sql/migration_finales_16.sql` dans Supabase. La phase finale ne génère plus 32 joueurs ni de tirage : un admin sélectionne exactement 16 joueurs, définit leur ordre (rang 1 à 16), programme les matchs, valide les scores et peut supprimer/reprogrammer chaque niveau.

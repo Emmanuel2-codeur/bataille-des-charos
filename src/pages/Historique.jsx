@@ -6,11 +6,14 @@ import { supabase } from '../lib/supabaseClient'
 
 const phaseLabels = {
   poule: 'Poule',
-  huitieme: 'Huitième',
+  trente_deuxieme: '32ème',
+  seizieme: '16ème',
   quart: 'Quart',
   demie: 'Demi-finale',
   finale: 'Finale',
 }
+
+const FINAL_PHASES = ['trente_deuxieme', 'seizieme', 'quart', 'demie', 'finale']
 
 export default function Historique() {
   const [matches, setMatches] = useState([])
@@ -31,6 +34,7 @@ export default function Historique() {
       .from('matches')
       .select(`
         id, phase, leg, match_type, score1, score2, damage1, damage2,
+        score1_retour, score2_retour, damage1_retour, damage2_retour,
         status, scheduled_at, round_label, winner_id,
         player1:profiles!matches_player1_id_fkey(id, pseudo),
         player2:profiles!matches_player2_id_fkey(id, pseudo),
@@ -93,19 +97,24 @@ export default function Historique() {
                     const p1 = match.player1?.pseudo || 'Joueur 1'
                     const p2 = match.player2?.pseudo || 'Joueur 2'
                     const winner = match.winner_id ? (match.winner_id === match.player1?.id ? p1 : p2) : 'Égalité'
+                    const isFinalPhase = FINAL_PHASES.includes(match.phase)
+                    const score1 = Number(match.score1 || 0) + (isFinalPhase ? Number(match.score1_retour || 0) : 0)
+                    const score2 = Number(match.score2 || 0) + (isFinalPhase ? Number(match.score2_retour || 0) : 0)
+                    const damage1 = Number(match.damage1 || 0) + (isFinalPhase ? Number(match.damage1_retour || 0) : 0)
+                    const damage2 = Number(match.damage2 || 0) + (isFinalPhase ? Number(match.damage2_retour || 0) : 0)
                     return (
                       <tr key={match.id} className="hover:bg-ink-800/70 transition-colors">
                         <td className="px-5 py-4">
                           <p className="font-bold">{p1} <span className="text-ink-600">vs</span> {p2}</p>
-                          <p className="text-xs text-ink-600 mt-1">{match.round_label || 'Match'}{match.groups?.name ? ` · Groupe ${match.groups.name}` : ''}</p>
+                          <p className="text-xs text-ink-600 mt-1">{match.round_label || 'Match'}{match.groups?.name ? ` · Groupe ${match.groups.name}` : ''}{isFinalPhase && <span className="text-charo-orange"> · cumul aller+retour</span>}</p>
                         </td>
                         <td className="px-5 py-4">
                           <span className="inline-flex rounded-full border border-ink-700 px-2.5 py-1 text-xs font-semibold">
                             {phaseLabels[match.phase] || match.phase}
                           </span>
                         </td>
-                        <td className="px-5 py-4 text-center font-display text-xl">{match.score1} — {match.score2}</td>
-                        <td className="px-5 py-4 text-center font-semibold">{match.damage1.toLocaleString('fr-FR')} — {match.damage2.toLocaleString('fr-FR')}</td>
+                        <td className="px-5 py-4 text-center font-display text-xl">{score1} — {score2}</td>
+                        <td className="px-5 py-4 text-center font-semibold">{damage1.toLocaleString('fr-FR')} — {damage2.toLocaleString('fr-FR')}</td>
                         <td className="px-5 py-4 font-bold text-charo-orange">{winner}</td>
                         <td className="px-5 py-4 text-ink-600">
                           <span className="inline-flex items-center gap-2">

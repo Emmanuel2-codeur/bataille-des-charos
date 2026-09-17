@@ -1,103 +1,40 @@
-import { useEffect, useState } from 'react'
-import { Trophy, MoveHorizontal, LoaderCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { LoaderCircle, RefreshCw, Trophy } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import BracketTree from '../components/BracketTree'
+import BracketTree, { BracketDetails } from '../components/BracketTree'
 import { supabase } from '../lib/supabaseClient'
 
-const PHASE_ORDER = ['seizieme', 'huitieme', 'quart', 'demie', 'finale']
-const PHASE_LABELS = { seizieme: 'Seizièmes de finale', huitieme: 'Huitièmes de finale', quart: 'Quarts de finale', demie: 'Demi-finales', finale: 'Finale' }
-const SLOTS_PER_PHASE = { seizieme: 16, huitieme: 8, quart: 4, demie: 2, finale: 1 }
-
 export default function Bracket() {
-  const [rounds, setRounds] = useState(null)
+  const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState(null)
+  const [error, setError] = useState('')
 
   const load = async () => {
-    const { data } = await supabase
-      .from('matches')
-      .select('id, phase, status, score1, score2, winner_id, player1_id, player2_id, player1:profiles!matches_player1_id_fkey(pseudo), player2:profiles!matches_player2_id_fkey(pseudo), created_at')
-      .in('phase', PHASE_ORDER)
-      .order('created_at', { ascending: true })
-
-    const byPhase = {}
-    ;(data || []).forEach((m) => {
-      if (!byPhase[m.phase]) byPhase[m.phase] = []
-      byPhase[m.phase].push(m)
-    })
-
-    const built = PHASE_ORDER.map((phase) => {
-      const matches = byPhase[phase] || []
-      const slots = SLOTS_PER_PHASE[phase]
-      const padded = Array.from({ length: slots }, (_, i) => {
-        const m = matches[i]
-        if (!m) return { player1: null, player2: null, score1: null, score2: null, winner: null }
-        return {
-          player1: m.player1?.pseudo ?? null,
-          player2: m.player2?.pseudo ?? null,
-          score1: m.status === 'scheduled' ? null : m.score1,
-          score2: m.status === 'scheduled' ? null : m.score2,
-          winner: m.winner_id ? (m.winner_id === m.player1_id ? 1 : 2) : null,
-        }
-      })
-      return { label: PHASE_LABELS[phase], matches: padded }
-    })
-
-    setRounds(built)
+    setLoading(true); setError('')
+    const { data, error: queryError } = await supabase.from('matches').select(`id,phase,round_label,bracket_position,match_type,leg,scheduled_at,scheduled_at_retour,status,status_override,score1,score2,damage1,damage2,score1_retour,score2_retour,damage1_retour,damage2_retour,winner_id,player1_id,player2_id,player1:profiles!matches_player1_id_fkey(id,pseudo,avatar_url),player2:profiles!matches_player2_id_fkey(id,pseudo,avatar_url)`).in('phase',['trente_deuxieme','seizieme','quart','demie','finale']).order('bracket_position',{ascending:true,nullsFirst:false}).order('created_at',{ascending:true})
+    if (queryError) setError(queryError.message)
+    else setMatches(data || [])
     setLoading(false)
   }
-
-  useEffect(() => {
-    load()
-    const channel = supabase
-      .channel?.('bracket-live')
-      ?.on?.('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, load)
-      ?.subscribe?.()
-    return () => { if (channel) supabase.removeChannel?.(channel) }
-  }, [])
-
-  const hasAnyMatch = rounds?.some((r) => r.matches.some((m) => m.player1 || m.player2))
-
-  return (
-    <div className="min-h-screen">
-      <Navbar />
-
-      <section className="py-14 lg:py-20">
-        <div className="max-w-7xl mx-auto px-5 lg:px-8">
-          <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
-            <div>
-              <span className="eyebrow mb-4"><Trophy size={12} className="inline -mt-0.5" /> Phases finales</span>
-              <h1 className="font-display text-4xl md:text-5xl">Arbre de compétition</h1>
-            </div>
-            <p className="flex items-center gap-2 text-xs text-ink-600 lg:hidden">
-              <MoveHorizontal size={14} /> Glisser pour naviguer
-            </p>
-          </div>
-          <p className="text-ink-600 max-w-xl mb-12">
-            Élimination directe pour les 32 qualifiés. Les seizièmes ouvrent le bracket, puis huitièmes, quarts, demies et finale. Chaque duel peut être joué en Aller (One Tap) / Retour (Spam).
-            Le vainqueur avance automatiquement au tour suivant.
-          </p>
-
-          <div className="card p-6 lg:p-10">
-            {loading ? (
-              <div className="flex items-center gap-3 text-ink-600 py-16 justify-center">
-                <LoaderCircle className="animate-spin" size={18} /> Chargement de l'arbre…
-              </div>
-            ) : (
-              <>
-                <BracketTree rounds={rounds} />
-                {!hasAnyMatch && (
-                  <p className="text-center text-ink-600 text-sm mt-6">
-                    L'arbre se remplira dès que la phase de poules sera terminée et que les 32 qualifiés seront désignés.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
+  useEffect(() => { load(); const ch=supabase.channel('final-bracket-live').on('postgres_changes',{event:'*',schema:'public',table:'matches'},load).subscribe(); return ()=>supabase.removeChannel(ch) },[])
+  const completed = useMemo(() => matches.filter(m => m.status === 'completed').length, [matches])
+  return <div className="min-h-screen bracket-page">
+    <Navbar />
+    <main className="py-10 lg:py-16">
+      <div className="max-w-[1600px] mx-auto px-4 lg:px-8">
+        <div className="bracket-page-head">
+          <div><span className="eyebrow mb-3"><Trophy size={13}/> Phase finale</span><h1 className="font-display text-5xl md:text-6xl text-ink-700">LE <span className="text-charo-orange">BRACKET</span></h1><p>32 finalistes · élimination directe · programmation manuelle · résultats en direct.</p></div>
+          <div className="flex items-center gap-3"><div className="bracket-stat"><strong>{matches.length}</strong><span>matchs programmés</span></div><div className="bracket-stat"><strong>{completed}</strong><span>résultats validés</span></div><button onClick={load} className="btn-outline" disabled={loading}><RefreshCw size={15} className={loading ? 'animate-spin' : ''}/> Actualiser</button></div>
         </div>
-      </section>
-
-      <Footer />
-    </div>
-  )
+        {error && <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm mb-5">{error}</div>}
+        <div className="bracket-shell">
+          {loading && !matches.length ? <div className="py-24 flex justify-center text-charo-orange"><LoaderCircle className="animate-spin"/></div> : <BracketTree matches={matches} onSelect={setSelected}/>} 
+        </div>
+        <p className="text-xs text-ink-600 mt-4 text-center">Clique sur un match pour afficher ses détails : score, dégâts, règle, horaire et vainqueur.</p>
+      </div>
+    </main>
+    {selected && <BracketDetails match={selected} onClose={() => setSelected(null)}/>}<Footer />
+  </div>
 }

@@ -21,12 +21,12 @@ const formatCards = [
   {
     icon: ListOrdered,
     title: 'Système de Repêchage',
-    text: "Les 2 premiers de chaque groupe sont qualifiés. Les 12 meilleurs joueurs restants complètent les 32 places selon les points, les dégâts et les kills.",
+    text: "Les matchs de poules alimentent le classement. L’administration choisit ensuite manuellement les 32 joueurs qui accèdent à la phase finale.",
   },
   {
     icon: Trophy,
     title: 'Phases Finales',
-    text: 'Arbre à élimination directe pour les 32 qualifiés : huitièmes, quarts, demies et grande finale.',
+    text: 'Arbre à élimination directe pour les 32 finalistes choisis par l’administration : 32èmes, 16èmes, quarts, demies et grande finale.',
   },
   {
     icon: Crosshair,
@@ -39,9 +39,9 @@ const formatCards = [
 const processSteps = [
   { n: '01', title: 'Inscription', text: 'Connexion via Google et création du profil joueur (pseudo, ID Free Fire).' },
   { n: '02', title: 'Validation', text: "Approbation manuelle de l'inscription par l'administration de la guilde." },
-  { n: '03', title: 'Tirage des groupes', text: 'Répartition dans l’un des 10 groupes (A à J) de 4 joueurs.' },
+  { n: '03', title: 'Répartition des groupes', text: 'Répartition dans l’un des 10 groupes (A à J) de 4 joueurs.' },
   { n: '04', title: 'Phase de poules', text: 'Championnat aller simple : chacun affronte les 3 autres joueurs de son groupe.' },
-  { n: '05', title: 'Phases finales', text: 'Top 32 qualifié, bracket à élimination directe jusqu’à la finale.' },
+  { n: '05', title: 'Phases finales', text: '32 finalistes choisis manuellement, puis bracket à élimination directe jusqu’à la finale.' },
 ]
 
 const prizeTiers = [
@@ -136,12 +136,15 @@ export default function Landing() {
             </p>
             <div className="home-actions-grid mb-10">
               {visibleActions.map((action) => {
-                const originalIndex = HOME_ACTIONS.indexOf(action)
-                const Icon = originalIndex === 0 ? Users : originalIndex === 1 ? Trophy : originalIndex === 2 ? Swords : Megaphone
+                const Icon = action.to === '/connexion' ? Users
+                  : action.to === '/classement' ? Trophy
+                  : action.to === '/matchs' ? Swords
+                  : action.to === '/finalistes' ? Medal
+                  : Megaphone
                 const variant = action.variant === 'primary' ? 'home-action-primary' : action.variant === 'dark' ? 'home-action-dark' : ''
                 return (
                   <Link key={action.to} to={action.to} className={`home-action ${variant}`}>
-                    <Icon size={18} strokeWidth={originalIndex === 0 || originalIndex === 2 ? 2.5 : 2} />
+                    <Icon size={18} strokeWidth={action.to === '/connexion' || action.to === '/matchs' ? 2.5 : 2} />
                     <span>{action.to === '/connexion' ? 'Se connecter' : action.label}</span>
                   </Link>
                 )

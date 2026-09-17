@@ -10,8 +10,10 @@ export const NAV_LINKS = [
 
 export const HOME_ACTIONS = [
   { to: '/connexion', label: 'Rejoindre le tournoi', variant: 'primary' },
-  { to: '/classement', label: 'Voir le classement', variant: 'default' },
   { to: '/matchs', label: 'Voir les matchs', variant: 'dark' },
+  { to: '/bracket', label: 'Voir le bracket', variant: 'default' },
+  { to: '/classement', label: 'Voir le classement', variant: 'default' },
+  { to: '/finalistes', label: 'Voir les 32 finalistes', variant: 'default' },
   { to: '/annonces', label: 'Voir les annonces', variant: 'default' },
 ]
 

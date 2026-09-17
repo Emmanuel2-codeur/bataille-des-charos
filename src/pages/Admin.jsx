@@ -15,6 +15,7 @@ import PlayerCombobox from '../components/PlayerCombobox'
 import DashboardSection from '../components/admin/DashboardSection'
 import AuditLogSection from '../components/admin/AuditLogSection'
 import SecurityAlertsSection from '../components/admin/SecurityAlertsSection'
+import FinalistsAdmin from '../components/FinalistsAdmin'
 
 const LAST_MATCH_SETTINGS_KEY = 'charos_admin_last_match_settings'
 
@@ -24,12 +25,14 @@ const MATCH_TYPES = [
 ]
 const PHASES = [
   { value: 'poule', label: 'Poule' },
+  { value: 'trente_deuxieme', label: '32ème de finale' },
   { value: 'seizieme', label: 'Seizième de finale' },
-  { value: 'huitieme', label: 'Huitième de finale' },
   { value: 'quart', label: 'Quart de finale' },
   { value: 'demie', label: 'Demi-finale' },
   { value: 'finale', label: 'Finale' },
 ]
+const FINAL_PHASES = ['trente_deuxieme', 'seizieme', 'quart', 'demie', 'finale']
+const FINAL_PHASE_COUNTS = { trente_deuxieme: 16, seizieme: 8, quart: 4, demie: 2, finale: 1 }
 
 export default function Admin() {
   const { profile, isSuperAdmin } = useAuth()
@@ -69,7 +72,7 @@ export default function Admin() {
       supabase
         .from('matches')
         .select(
-          'id, phase, group_id, leg, match_type, round_label, player1_id, player2_id, score1, score2, damage1, damage2, status, status_override, is_featured, scheduled_at, player1:profiles!matches_player1_id_fkey(pseudo), player2:profiles!matches_player2_id_fkey(pseudo)'
+          'id, phase, group_id, leg, match_type, round_label, bracket_position, player1_id, player2_id, score1, score2, damage1, damage2, score1_retour, score2_retour, damage1_retour, damage2_retour, winner_id, status, status_override, is_featured, scheduled_at, scheduled_at_retour, player1:profiles!matches_player1_id_fkey(pseudo), player2:profiles!matches_player2_id_fkey(pseudo)'
         )
         .order('scheduled_at', { ascending: true, nullsFirst: false }),
       supabase.from('announcements').select('id, title, body, published, category, image_url, author_id, created_at').order('created_at', { ascending: false }),
@@ -118,13 +121,14 @@ export default function Admin() {
       { id: 'dashboard', label: 'Vue d’ensemble', icon: <LayoutDashboard size={15} /> },
       { id: 'inscriptions', label: 'Inscriptions', icon: <UserPlus size={15} />, badge: pending.length },
       { id: 'joueurs', label: 'Joueurs & poules', icon: <Users size={15} /> },
+      { id: 'finalistes', label: 'Joueurs qualifiés', icon: <Trophy size={15} />, badge: players.filter(p => p.is_qualified).length },
       { id: 'matchs', label: 'Matchs', icon: <Swords size={15} />, badge: matches.filter(m => m.status !== 'completed').length },
       { id: 'annonces', label: 'Annonces', icon: <Megaphone size={15} /> },
       { id: 'journal', label: 'Journal', icon: <History size={15} /> },
     ]
     if (isSuperAdmin) list.push({ id: 'securite', label: 'Sécurité', icon: <ShieldAlert size={15} />, badge: unresolvedAlerts })
     return list
-  }, [pending.length, matches, isSuperAdmin, unresolvedAlerts])
+  }, [pending.length, matches, players, isSuperAdmin, unresolvedAlerts])
 
   return (
     <div className="min-h-screen">
@@ -176,16 +180,22 @@ export default function Admin() {
                     players={players} groups={groups}
                     onChanged={loadAll} setError={setError} setMessage={setMessage}
                   />
-                  <QualificationSection
-                    onChanged={loadAll} setError={setError} setMessage={setMessage}
-                  />
                 </>
+              )}
+
+              {tab === 'finalistes' && (
+                <FinalistsAdmin
+                  players={players}
+                  onChanged={loadAll}
+                  setError={setError}
+                  setMessage={setMessage}
+                />
               )}
 
               {tab === 'matchs' && (
                 <>
                   <ScheduleMatchSection
-                    players={players} groups={groups}
+                    players={players} groups={groups} matches={matches}
                     onCreated={loadAll} setError={setError} setMessage={setMessage}
                   />
                   <ValidateScoreSection
@@ -366,35 +376,9 @@ function PlayerManagementSection({ players, groups, onChanged, setError, setMess
 }
 
 /* ============================================================================
-   3. QUALIFICATION DES 32
+   Les qualifications de la phase finale sont désormais gérées dans l’onglet
+   « Joueurs qualifiés » : sélection manuelle de 32 joueurs, sans tirage.
    ============================================================================ */
-function QualificationSection({ onChanged, setError, setMessage }) {
-  const [busy, setBusy] = useState(false)
-  const compute = async () => {
-    setBusy(true); setError(''); setMessage('')
-    const { error } = await supabase.rpc('compute_qualifications_32')
-    if (error) setError(error.message)
-    else { setMessage('32 qualifiés calculés : 2 joueurs par groupe + 12 meilleurs joueurs restants.'); onChanged() }
-    setBusy(false)
-  }
-  const generate = async () => {
-    setBusy(true); setError(''); setMessage('')
-    const { data, error } = await supabase.rpc('generate_round_of_32')
-    if (error) setError(error.message)
-    else { setMessage(`${data || 16} matchs de seizièmes générés.`); onChanged() }
-    setBusy(false)
-  }
-  return (
-    <div className="mb-14">
-      <div className="flex items-center gap-2.5 mb-1"><Trophy size={18} className="text-charo-orange" /><h2 className="font-bold text-lg text-ink-700">Qualification pour les seizièmes — 32 joueurs</h2></div>
-      <p className="text-sm text-ink-600 mb-5">2 joueurs par groupe (20) sont retenus, puis les 12 meilleurs joueurs restants complètent les 32 selon points, dégâts et kills.</p>
-      <div className="card p-5 flex flex-wrap gap-3">
-        <button onClick={compute} disabled={busy} className="btn-primary"><Trophy size={15} /> Calculer les 32 qualifiés</button>
-        <button onClick={generate} disabled={busy} className="btn-outline"><CalendarPlus size={15} /> Générer les 16 matchs de seizièmes</button>
-      </div>
-    </div>
-  )
-}
 
 /* ============================================================================
    4. PROGRAMMER UN MATCH
@@ -406,7 +390,7 @@ function loadLastMatchSettings() {
   } catch { return null }
 }
 
-function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage }) {
+function ScheduleMatchSection({ players, groups, matches = [], onCreated, setError, setMessage }) {
   const remembered = loadLastMatchSettings()
   const [form, setForm] = useState({
     player1_id: '', player2_id: '', scheduled_at: '',
@@ -453,7 +437,27 @@ function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage
     if (form.player1_id === form.player2_id) { setError('Les deux joueurs doivent être différents.'); return }
 
     setSaving(true)
-    const { error } = await supabase.from('matches').insert({
+
+    // Les matchs de la phase finale ont toujours une case de bracket explicite.
+    // Ainsi, une programmation depuis l'onglet « Matchs » arrive elle aussi
+    // directement dans 16èmes / Quarts / Demies / Finale.
+    const isFinalPhase = FINAL_PHASES.includes(form.phase)
+    let bracket_position = null
+    let round_label = null
+
+    if (isFinalPhase) {
+      const counts = FINAL_PHASE_COUNTS
+      const used = new Set(matches.filter(m => m.phase === form.phase).map(m => Number(m.bracket_position || 0)))
+      bracket_position = Array.from({ length: counts[form.phase] }, (_, i) => i + 1).find(pos => !used.has(pos))
+      if (!bracket_position) {
+        setError(`Toutes les cases de ${PHASES.find(p => p.value === form.phase)?.label || form.phase} sont déjà occupées.`)
+        setSaving(false)
+        return
+      }
+      round_label = `${PHASES.find(p => p.value === form.phase)?.label || form.phase} ${bracket_position}`
+    }
+
+    const { data: createdMatch, error } = await supabase.from('matches').insert({
       player1_id: form.player1_id,
       player2_id: form.player2_id,
       scheduled_at: form.scheduled_at || null,
@@ -463,11 +467,18 @@ function ScheduleMatchSection({ players, groups, onCreated, setError, setMessage
       group_id: form.phase === 'poule' ? (form.group_id || null) : null,
       status: 'scheduled',
       status_override: false,
-    })
+      bracket_position,
+      round_label,
+    }).select('id').single()
 
     if (error) setError(error.message)
     else {
-      setMessage('Match programmé. Il passera en cours tout seul à l’heure prévue.')
+      if (isFinalPhase && createdMatch?.id && form.phase !== 'trente_deuxieme') {
+        await supabase.rpc('sync_final_bracket_match_players', { p_match_id: createdMatch.id })
+      }
+      setMessage(isFinalPhase
+        ? `Match programmé dans ${round_label}. Il est maintenant visible dans le tableau de la phase finale pour modification et validation du score.`
+        : 'Match programmé. Il passera en cours tout seul à l’heure prévue.')
       // On mémorise les réglages (hors joueurs et date) pour préremplir le prochain match
       const hour = form.scheduled_at?.length >= 16 ? form.scheduled_at.slice(11, 16) : rememberHour
       localStorage.setItem(LAST_MATCH_SETTINGS_KEY, JSON.stringify({
@@ -567,19 +578,49 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
 
   const validate = async (m) => {
     setSavingId(m.id); setError(''); setMessage('')
-    const { error } = await supabase
-      .from('matches')
-      .update({
-        score1: Number(m.score1), score2: Number(m.score2),
-        damage1: Number(m.damage1), damage2: Number(m.damage2),
-        status: 'completed',
-      })
-      .eq('id', m.id)
 
-    if (error) setError(error.message)
-    else {
-      setMessage('Match validé — kills, dégâts et classement mis à jour, match déplacé dans l’Historique.')
-      onSaved()
+    const score1 = Number(m.score1)
+    const score2 = Number(m.score2)
+    const damage1 = Number(m.damage1 || 0)
+    const damage2 = Number(m.damage2 || 0)
+    const isFinal = FINAL_PHASES.includes(m.phase)
+    const score1_retour = Number(m.score1_retour || 0)
+    const score2_retour = Number(m.score2_retour || 0)
+    const damage1_retour = Number(m.damage1_retour || 0)
+    const damage2_retour = Number(m.damage2_retour || 0)
+
+    const baseNums = [score1, score2, damage1, damage2]
+    const retourNums = isFinal ? [score1_retour, score2_retour, damage1_retour, damage2_retour] : []
+    if (![...baseNums, ...retourNums].every(Number.isFinite) || [...baseNums, ...retourNums].some(v => v < 0)) {
+      setError('Les scores et dégâts doivent être des nombres positifs.')
+      setSavingId(null)
+      return
+    }
+    if (isFinal) {
+      const total1 = score1 + score1_retour
+      const total2 = score2 + score2_retour
+      if (total1 === total2) {
+        setError(`Égalité sur le cumul aller + retour (${total1} - ${total2}) : impossible de déterminer le joueur qui avance.`)
+        setSavingId(null)
+        return
+      }
+      const { error } = await supabase.rpc('admin_validate_final_match', {
+        p_match_id: m.id, p_score1: score1, p_score2: score2, p_damage1: damage1, p_damage2: damage2,
+        p_score1_retour: score1_retour, p_score2_retour: score2_retour, p_damage1_retour: damage1_retour, p_damage2_retour: damage2_retour,
+      })
+      if (error) setError(error.message)
+      else {
+        const winner = total1 > total2 ? m.player1?.pseudo : m.player2?.pseudo
+        setMessage(`Résultat validé (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance vers la prochaine case du bracket.`)
+        onSaved()
+      }
+    } else {
+      const { error } = await supabase.from('matches').update({ score1, score2, damage1, damage2, status: 'completed' }).eq('id', m.id)
+      if (error) setError(error.message)
+      else {
+        setMessage('Match validé — kills, dégâts et classement mis à jour, match déplacé dans l’Historique.')
+        onSaved()
+      }
     }
     setSavingId(null)
   }
@@ -598,30 +639,58 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
 
       <div className="card divide-y divide-ink-700">
         {nonCompleted.length === 0 && <p className="p-6 text-sm text-ink-600">Aucun match à valider pour l'instant.</p>}
-        {nonCompleted.map((m) => (
-          <div key={m.id} className="p-5 flex flex-wrap items-center gap-5">
+        {nonCompleted.map((m) => {
+          const isFinal = FINAL_PHASES.includes(m.phase)
+          const total1 = Number(m.score1 || 0) + (isFinal ? Number(m.score1_retour || 0) : 0)
+          const total2 = Number(m.score2 || 0) + (isFinal ? Number(m.score2_retour || 0) : 0)
+          return (
+          <div key={m.id} className="p-5 flex flex-wrap items-start gap-5">
             <div className="min-w-[210px]">
               <p className="text-sm font-semibold">{m.player1?.pseudo || '—'} <span className="text-ink-600">vs</span> {m.player2?.pseudo || '—'}</p>
               <p className="text-xs text-ink-600 flex items-center gap-1.5 mt-1">
                 <Clock size={11} /> {m.round_label || m.phase} · {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString('fr-FR') : 'sans horaire'} ·{' '}
                 <span className={m.status === 'in_progress' ? 'text-live font-bold' : ''}>{m.status === 'in_progress' ? 'EN COURS' : m.status === 'scheduled' ? 'Programmé' : m.status}</span>
               </p>
+              {isFinal && <p className="text-[11px] text-charo-orange font-semibold mt-1.5">Cumul aller + retour : {total1} - {total2}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <label className="text-[11px] text-ink-600">Kills J1
-                <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-              </label>
-              <label className="text-[11px] text-ink-600">Kills J2
-                <input type="number" min="0" value={m.score2} onChange={(e) => patch(m.id, { score2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-              </label>
-              <label className="text-[11px] text-ink-600">Dégâts J1
-                <input type="number" min="0" value={m.damage1} onChange={(e) => patch(m.id, { damage1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-              </label>
-              <label className="text-[11px] text-ink-600">Dégâts J2
-                <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-              </label>
+            <div>
+              {isFinal && <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match aller</p>}
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <label className="text-[11px] text-ink-600">Kills J1
+                  <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                </label>
+                <label className="text-[11px] text-ink-600">Kills J2
+                  <input type="number" min="0" value={m.score2} onChange={(e) => patch(m.id, { score2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                </label>
+                <label className="text-[11px] text-ink-600">Dégâts J1
+                  <input type="number" min="0" value={m.damage1} onChange={(e) => patch(m.id, { damage1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                </label>
+                <label className="text-[11px] text-ink-600">Dégâts J2
+                  <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                </label>
+              </div>
             </div>
+
+            {isFinal && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match retour</p>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <label className="text-[11px] text-ink-600">Kills J1
+                    <input type="number" min="0" value={m.score1_retour || 0} onChange={(e) => patch(m.id, { score1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                  </label>
+                  <label className="text-[11px] text-ink-600">Kills J2
+                    <input type="number" min="0" value={m.score2_retour || 0} onChange={(e) => patch(m.id, { score2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                  </label>
+                  <label className="text-[11px] text-ink-600">Dégâts J1
+                    <input type="number" min="0" value={m.damage1_retour || 0} onChange={(e) => patch(m.id, { damage1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                  </label>
+                  <label className="text-[11px] text-ink-600">Dégâts J2
+                    <input type="number" min="0" value={m.damage2_retour || 0} onChange={(e) => patch(m.id, { damage2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                  </label>
+                </div>
+              </div>
+            )}
 
             <button onClick={() => toggleFeatured(m)} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${m.is_featured ? 'bg-charo-orange/15 border-charo-orange/40 text-charo-orange' : 'border-ink-700 text-ink-600 hover:text-ink-950'}`}>
               <Star size={13} fill={m.is_featured ? 'currentColor' : 'none'} /> À la une
@@ -632,7 +701,7 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
               Valider le résultat
             </button>
           </div>
-        ))}
+        )})}
       </div>
     </div>
   )
@@ -654,9 +723,12 @@ function MatchManagementSection({ matches, players, groups, onChanged, setError,
       phase: m.phase, group_id: m.phase === 'poule' ? (m.group_id || null) : null,
       leg: m.phase === 'poule' ? null : (m.leg || 'aller'),
       match_type: m.match_type, scheduled_at: m.scheduled_at || null,
+      bracket_position: m.bracket_position || null,
+      round_label: m.round_label || null,
       score1: Number(m.score1 || 0), score2: Number(m.score2 || 0),
       damage1: Number(m.damage1 || 0), damage2: Number(m.damage2 || 0),
-      status: m.status, status_override: !!m.status_override, is_featured: !!m.is_featured, round_label: m.round_label || null,
+      winner_id: m.winner_id || null,
+      status: m.status, status_override: !!m.status_override, is_featured: !!m.is_featured,
     }).eq('id', m.id)
     if (error) setError(error.message)
     else { setMessage('Match modifié et statistiques recalculées si nécessaire.'); setEditing(null); onChanged() }
