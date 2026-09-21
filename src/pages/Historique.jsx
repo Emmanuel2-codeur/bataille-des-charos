@@ -6,8 +6,8 @@ import { supabase } from '../lib/supabaseClient'
 
 const phaseLabels = {
   poule: 'Poule',
-  trente_deuxieme: '32ème',
-  seizieme: '16ème',
+  trente_deuxieme: '16ème',
+  seizieme: 'Huitième',
   quart: 'Quart',
   demie: 'Demi-finale',
   finale: 'Finale',

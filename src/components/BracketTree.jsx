@@ -1,11 +1,11 @@
 import { CalendarClock, Clock3, Crosshair, Crown, Shield, Trophy, Zap } from 'lucide-react'
 
-// La phase finale se joue en 32èmes → 16èmes → quarts → demies → finale.
+// La phase finale se joue en 16èmes → huitièmes → quarts → demies → finale.
 // Chaque tour (sauf la finale) est scindé en deux moitiés symétriques (gauche/droite)
 // qui convergent vers la finale au centre, comme un vrai tableau de tournoi.
 const ROUNDS = [
-  { phase: 'trente_deuxieme', short: '32èmes', full: 16 },
-  { phase: 'seizieme', short: '16èmes', full: 8 },
+  { phase: 'trente_deuxieme', short: '16èmes', full: 16 },
+  { phase: 'seizieme', short: 'Huitièmes', full: 8 },
   { phase: 'quart', short: 'Quarts', full: 4 },
   { phase: 'demie', short: 'Demies', full: 2 },
 ]
@@ -86,7 +86,7 @@ function BracketSlot({ match, onSelect, incomingEdge, outgoing }) {
 }
 
 // side: 'left' (le flux sort vers la droite) ou 'right' (le flux sort vers la gauche, en miroir).
-// roundIndex: 0 = tour le plus large (32èmes), le dernier = demies.
+// roundIndex: 0 = tour le plus large (16èmes), le dernier = demies.
 function RoundColumn({ side, roundIndex, slots, meta, matchesCountLabel, onSelect }) {
   const half = slots.length
   const outEdge = side === 'left' ? 'right' : 'left'

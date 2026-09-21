@@ -25,7 +25,7 @@ export default function Finalistes() {
       <div className="max-w-7xl mx-auto px-5 lg:px-8">
         <div className="finalists-public-hero">
           <span className="eyebrow mb-4"><Trophy size={13}/> Phase finale</span>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6"><div><h1 className="font-display text-5xl md:text-6xl text-ink-700">LES 32 <span className="text-charo-orange">FINALISTES</span></h1><p className="text-ink-600 max-w-2xl mt-4">Les 32 joueurs choisis par l’administration s’affrontent désormais en élimination directe : 32èmes, 16èmes, quarts, demi-finales puis grande finale.</p></div><Link to="/bracket" className="btn-primary"><Trophy size={16}/> Voir le bracket</Link></div>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6"><div><h1 className="font-display text-5xl md:text-6xl text-ink-700">LES 32 <span className="text-charo-orange">FINALISTES</span></h1><p className="text-ink-600 max-w-2xl mt-4">Les 32 joueurs choisis par l’administration s’affrontent désormais en élimination directe : 16èmes, huitièmes, quarts, demi-finales puis grande finale.</p></div><Link to="/bracket" className="btn-primary"><Trophy size={16}/> Voir le bracket</Link></div>
         </div>
         {loading ? <div className="py-20 flex justify-center"><LoaderCircle className="animate-spin text-charo-orange"/></div> : <>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">

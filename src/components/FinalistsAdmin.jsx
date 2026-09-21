@@ -6,8 +6,8 @@ import {
 import { supabase } from '../lib/supabaseClient'
 
 const PHASES = [
-  { key: 'trente_deuxieme', label: '32èmes de finale', short: '32èmes', count: 16, previous: null },
-  { key: 'seizieme', label: '16èmes de finale', short: '16èmes', count: 8, previous: 'trente_deuxieme' },
+  { key: 'trente_deuxieme', label: '16èmes de finale', short: '16èmes', count: 16, previous: null },
+  { key: 'seizieme', label: 'Huitièmes de finale', short: 'Huitièmes', count: 8, previous: 'trente_deuxieme' },
   { key: 'quart', label: 'Quarts de finale', short: 'Quarts', count: 4, previous: 'seizieme' },
   { key: 'demie', label: 'Demi-finales', short: 'Demies', count: 2, previous: 'quart' },
   { key: 'finale', label: 'Grande finale', short: 'Finale', count: 1, previous: 'demie' },
@@ -319,7 +319,7 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
         </div>
 
         <div id="finalistes-programmer" className="final-schedule-panel rounded-2xl border border-charo-orange/30 bg-charo-orange/[0.035] p-5 mb-8">
-          <div className="flex items-center justify-between gap-3 mb-4"><div><h4 className="font-bold">{editingId ? `Modifier ${PHASES.find(p => p.key === phaseFilter)?.short || ''} — case ${targetPosition || ''}` : `Programmer → ${PHASES.find(p => p.key === (phaseFilter === 'all' ? 'trente_deuxieme' : phaseFilter))?.short || '32èmes'} ${targetPosition || ''}`}</h4><p className="text-xs text-ink-600">Après enregistrement, le match apparaît dans la case correspondante du tableau. C’est depuis cette case que tu le modifies et valides son score.</p></div>{editingId && <button onClick={() => { setEditingId(null); setEditingSnapshot(null); setForm(EMPTY_FORM); setTargetPosition(null) }} className="rank-action"><X size={14} /></button>}</div>
+          <div className="flex items-center justify-between gap-3 mb-4"><div><h4 className="font-bold">{editingId ? `Modifier ${PHASES.find(p => p.key === phaseFilter)?.short || ''} — case ${targetPosition || ''}` : `Programmer → ${PHASES.find(p => p.key === (phaseFilter === 'all' ? 'trente_deuxieme' : phaseFilter))?.short || '16èmes'} ${targetPosition || ''}`}</h4><p className="text-xs text-ink-600">Après enregistrement, le match apparaît dans la case correspondante du tableau. C’est depuis cette case que tu le modifies et valides son score.</p></div>{editingId && <button onClick={() => { setEditingId(null); setEditingSnapshot(null); setForm(EMPTY_FORM); setTargetPosition(null) }} className="rank-action"><X size={14} /></button>}</div>
           <form onSubmit={saveMatch} className="grid sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <select value={phaseFilter === 'all' ? 'trente_deuxieme' : phaseFilter} onChange={e => { const phase = e.target.value; setPhaseFilter(phase); const meta = PHASES.find(p => p.key === phase); const used = new Set(matches.filter(m => m.phase === phase && m.id !== editingId).map(m => Number(m.bracket_position || 0))); setTargetPosition(Array.from({ length: meta.count }, (_, i) => i + 1).find(pos => !used.has(pos)) || 1) }} className="field">{PHASES.map(p => <option key={p.key} value={p.key}>{p.short}</option>)}</select>
             <select value={form.player1_id} onChange={e => setForm(f => ({ ...f, player1_id: e.target.value }))} className="field"><option value="">Joueur 1</option>{players.filter(p => p.is_qualified || p.id === form.player1_id).map(p => <option key={p.id} value={p.id}>{p.pseudo}</option>)}</select>
@@ -330,7 +330,7 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
           </form>
         </div>
 
-        <div id="finalistes-bracket-admin" className="final-admin-bracket"><div className="final-admin-bracket-head"><div><span className="eyebrow mb-2"><Trophy size={13} /> Tableau de gestion</span><h3 className="font-display text-2xl">32èmes → 16èmes → Quarts → Demies → Finale</h3><p className="text-sm text-ink-600 mt-1">Chaque case est un match aller-retour. Clique dessus pour saisir les kills et dégâts des deux manches, puis valider le score cumulé.</p></div><div className="final-admin-flow"><span>PROGRAMMÉ</span><b>→</b><span>VALIDÉ</span><b>→</b><span>VAINQUEUR</span></div></div><div className="grid lg:grid-cols-5 gap-4">
+        <div id="finalistes-bracket-admin" className="final-admin-bracket"><div className="final-admin-bracket-head"><div><span className="eyebrow mb-2"><Trophy size={13} /> Tableau de gestion</span><h3 className="font-display text-2xl">16èmes → Huitièmes → Quarts → Demies → Finale</h3><p className="text-sm text-ink-600 mt-1">Chaque case est un match aller-retour. Clique dessus pour saisir les kills et dégâts des deux manches, puis valider le score cumulé.</p></div><div className="final-admin-flow"><span>PROGRAMMÉ</span><b>→</b><span>VALIDÉ</span><b>→</b><span>VAINQUEUR</span></div></div><div className="grid lg:grid-cols-5 gap-4">
           {PHASES.map((phase) => {
             const rows = byPhase(phase.key)
             const next = previousWinners(phase.key)

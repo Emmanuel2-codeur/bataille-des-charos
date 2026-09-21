@@ -25,8 +25,8 @@ const MATCH_TYPES = [
 ]
 const PHASES = [
   { value: 'poule', label: 'Poule' },
-  { value: 'trente_deuxieme', label: '32ème de finale' },
-  { value: 'seizieme', label: 'Seizième de finale' },
+  { value: 'trente_deuxieme', label: '16ème de finale' },
+  { value: 'seizieme', label: 'Huitième de finale' },
   { value: 'quart', label: 'Quart de finale' },
   { value: 'demie', label: 'Demi-finale' },
   { value: 'finale', label: 'Finale' },

@@ -26,7 +26,7 @@ const formatCards = [
   {
     icon: Trophy,
     title: 'Phases Finales',
-    text: 'Arbre à élimination directe pour les 32 finalistes choisis par l’administration : 32èmes, 16èmes, quarts, demies et grande finale.',
+    text: 'Arbre à élimination directe pour les 32 finalistes choisis par l’administration : 16èmes, huitièmes, quarts, demies et grande finale.',
   },
   {
     icon: Crosshair,

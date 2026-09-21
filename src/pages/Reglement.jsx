@@ -9,7 +9,7 @@ const sections = [
     items: [
       '40 joueurs répartis en 10 groupes (A à J) de 4 joueurs.',
       'Phase de poules en championnat : chaque joueur affronte les 3 autres de son groupe.',
-      'Phases finales : élimination directe pour les 32 finalistes choisis par l’administration (32èmes, 16èmes, quarts, demies, finale).',
+      'Phases finales : élimination directe pour les 32 finalistes choisis par l’administration (16èmes, huitièmes, quarts, demies, finale).',
     ],
   },
   {
@@ -33,7 +33,7 @@ const sections = [
     icon: Trophy,
     title: '4. Déroulement des phases finales',
     items: [
-      '32èmes de finale à partir des 32 joueurs choisis par l’administration.',
+      '16èmes de finale à partir des 32 joueurs choisis par l’administration.',
       'Progression par élimination directe jusqu\'à la grande finale.',
       'Navigation de l\'arbre par swipe horizontal sur mobile.',
     ],
