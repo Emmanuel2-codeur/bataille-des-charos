@@ -2,8 +2,8 @@
 // Cela évite de disperser les routes dans plusieurs composants.
 export const NAV_LINKS = [
   { to: '/', label: 'Accueil' },
-  { to: '/matchs', label: 'Matchs programmés' },
-  { to: '/groupes', label: 'Poules' },
+  { to: '/matchs', label: 'Matchs' },
+  { to: '/bracket', label: '16ème de finales' },
   { to: '/classement', label: 'Classement' },
   { to: '/historique', label: 'Historique' },
 ]
