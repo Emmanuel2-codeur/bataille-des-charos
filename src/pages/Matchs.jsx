@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
+import { phaseLabel } from '../config/phaseLabels'
 
 const filters = [
   { key: 'all', label: 'Tous les matchs', icon: Filter },
@@ -429,7 +430,7 @@ export default function Matchs() {
 
                                   <div>
                                     <span className="text-xs font-bold uppercase tracking-[0.16em] text-charo-orange">
-                                      {match.phase ||
+                                      {phaseLabel(match.phase) ||
                                         'Match'}
                                     </span>
 

@@ -1,13 +1,14 @@
 import { CalendarClock, Clock3, Crosshair, Crown, Shield, Trophy, Zap } from 'lucide-react'
+import { phaseShortLabel } from '../config/phaseLabels'
 
 // La phase finale se joue en 16èmes → huitièmes → quarts → demies → finale.
 // Chaque tour (sauf la finale) est scindé en deux moitiés symétriques (gauche/droite)
 // qui convergent vers la finale au centre, comme un vrai tableau de tournoi.
 const ROUNDS = [
-  { phase: 'trente_deuxieme', short: '16èmes', full: 16 },
-  { phase: 'seizieme', short: 'Huitièmes', full: 8 },
-  { phase: 'quart', short: 'Quarts', full: 4 },
-  { phase: 'demie', short: 'Demies', full: 2 },
+  { phase: 'trente_deuxieme', short: phaseShortLabel('trente_deuxieme'), full: 16 },
+  { phase: 'seizieme', short: phaseShortLabel('seizieme'), full: 8 },
+  { phase: 'quart', short: phaseShortLabel('quart'), full: 4 },
+  { phase: 'demie', short: phaseShortLabel('demie'), full: 2 },
 ]
 
 function findMatch(matches, phase, position) {

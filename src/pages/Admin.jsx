@@ -16,6 +16,7 @@ import DashboardSection from '../components/admin/DashboardSection'
 import AuditLogSection from '../components/admin/AuditLogSection'
 import SecurityAlertsSection from '../components/admin/SecurityAlertsSection'
 import FinalistsAdmin from '../components/FinalistsAdmin'
+import { PHASE_LABELS, FINAL_PHASES, FINAL_PHASE_COUNTS } from '../config/phaseLabels'
 
 const LAST_MATCH_SETTINGS_KEY = 'charos_admin_last_match_settings'
 
@@ -23,16 +24,7 @@ const MATCH_TYPES = [
   { value: 'onetap', label: 'One Tap (Aller)' },
   { value: 'spam', label: 'Spam (Retour)' },
 ]
-const PHASES = [
-  { value: 'poule', label: 'Poule' },
-  { value: 'trente_deuxieme', label: '16ème de finale' },
-  { value: 'seizieme', label: 'Huitième de finale' },
-  { value: 'quart', label: 'Quart de finale' },
-  { value: 'demie', label: 'Demi-finale' },
-  { value: 'finale', label: 'Finale' },
-]
-const FINAL_PHASES = ['trente_deuxieme', 'seizieme', 'quart', 'demie', 'finale']
-const FINAL_PHASE_COUNTS = { trente_deuxieme: 16, seizieme: 8, quart: 4, demie: 2, finale: 1 }
+const PHASES = Object.entries(PHASE_LABELS).map(([value, label]) => ({ value, label }))
 
 export default function Admin() {
   const { profile, isSuperAdmin } = useAuth()
@@ -571,6 +563,19 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
 
   const patch = (id, p) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)))
 
+  // datetime-local a besoin de l'heure LOCALE, jamais d'UTC (toISOString
+  // décale l'heure affichée du fuseau horaire, ce qui fait "sauter" la
+  // valeur juste après l'avoir saisie). Si la valeur est déjà au format
+  // local (tapée à l'instant), on la garde telle quelle.
+  const toDatetimeLocalValue = (v) => {
+    if (!v) return ''
+    if (typeof v === 'string' && v.length === 16 && !v.includes('Z') && !v.includes('+')) return v
+    const d = new Date(v)
+    if (Number.isNaN(d.getTime())) return ''
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
   const toggleFeatured = async (m) => {
     const { error } = await supabase.from('matches').update({ is_featured: !m.is_featured }).eq('id', m.id)
     if (!error) onSaved()
@@ -587,16 +592,16 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
       setSavingId(null)
       return
     }
-    const { error } = await supabase.rpc('admin_validate_aller', { p_match_id: m.id, p_score1: score1, p_score2: score2, p_damage1: damage1, p_damage2: damage2 })
+    const { error } = await supabase.from('matches').update({ score1, score2, damage1, damage2, aller_validated: true }).eq('id', m.id)
     if (error) setError(error.message)
-    else { setMessage('Match aller validé. Programme et valide le retour pour déterminer le qualifié.'); onSaved() }
+    else { setMessage('Match aller enregistré. Programme puis renseigne le retour pour déterminer le qualifié.'); onSaved() }
     setSavingId(null)
   }
 
   const scheduleRetour = async (m) => {
     if (!m.scheduled_at_retour) { setError('Choisis une date pour le match retour.'); return }
     setSavingId(m.id); setError(''); setMessage('')
-    const { error } = await supabase.rpc('admin_schedule_retour', { p_match_id: m.id, p_scheduled_at: new Date(m.scheduled_at_retour).toISOString() })
+    const { error } = await supabase.from('matches').update({ scheduled_at_retour: new Date(m.scheduled_at_retour).toISOString() }).eq('id', m.id)
     if (error) setError(error.message)
     else { setMessage('Date du match retour enregistrée.'); onSaved() }
     setSavingId(null)
@@ -615,16 +620,11 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
     }
     const total1 = Number(m.score1 || 0) + score1_retour
     const total2 = Number(m.score2 || 0) + score2_retour
-    if (total1 === total2) {
-      setError(`Égalité sur le cumul aller + retour (${total1} - ${total2}) : impossible de déterminer le joueur qui avance.`)
-      setSavingId(null)
-      return
-    }
-    const { error } = await supabase.rpc('admin_validate_retour', { p_match_id: m.id, p_score1_retour: score1_retour, p_score2_retour: score2_retour, p_damage1_retour: damage1_retour, p_damage2_retour: damage2_retour })
-    if (error) setError(error.message)
+    const { error } = await supabase.from('matches').update({ score1_retour, score2_retour, damage1_retour, damage2_retour, retour_validated: true }).eq('id', m.id)
+    if (error) setError(error.message) // ex : égalité cumulée, refusée automatiquement par la base
     else {
       const winner = total1 > total2 ? m.player1?.pseudo : m.player2?.pseudo
-      setMessage(`Retour validé (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance vers la prochaine case du bracket.`)
+      setMessage(`Retour enregistré (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance vers la prochaine case du bracket.`)
       onSaved()
     }
     setSavingId(null)
@@ -659,99 +659,130 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
         Score = kills du joueur sur ce match. Une fois validé, le match sort automatiquement des matchs en cours et rejoint l'Historique.
       </p>
 
-      <div className="card divide-y divide-ink-700">
-        {nonCompleted.length === 0 && <p className="p-6 text-sm text-ink-600">Aucun match à valider pour l'instant.</p>}
+      <div className="space-y-4">
+        {nonCompleted.length === 0 && <div className="card p-8 text-sm text-ink-600 text-center">Aucun match à valider pour l'instant.</div>}
         {nonCompleted.map((m) => {
           const isFinal = FINAL_PHASES.includes(m.phase)
           const alreadyPlayedAller = m.status === 'aller_completed'
           const total1 = Number(m.score1 || 0) + (isFinal ? Number(m.score1_retour || 0) : 0)
           const total2 = Number(m.score2 || 0) + (isFinal ? Number(m.score2_retour || 0) : 0)
+          const statusPill = m.status === 'in_progress'
+            ? { text: 'EN COURS', className: 'bg-live/10 text-live border-live/30' }
+            : alreadyPlayedAller
+              ? { text: 'ALLER TERMINÉ — RETOUR EN ATTENTE', className: 'bg-charo-orange/10 text-charo-orange border-charo-orange/30' }
+              : { text: 'PROGRAMMÉ', className: 'bg-ink-800 text-ink-600 border-ink-700' }
+
           return (
-          <div key={m.id} className="p-5 flex flex-wrap items-start gap-5">
-            <div className="min-w-[210px]">
-              <p className="text-sm font-semibold">{m.player1?.pseudo || '—'} <span className="text-ink-600">vs</span> {m.player2?.pseudo || '—'}</p>
-              <p className="text-xs text-ink-600 flex items-center gap-1.5 mt-1">
-                <Clock size={11} /> {m.round_label || m.phase} · {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString('fr-FR') : 'sans horaire'} ·{' '}
-                <span className={m.status === 'in_progress' ? 'text-live font-bold' : alreadyPlayedAller ? 'text-charo-orange font-bold' : ''}>
-                  {m.status === 'in_progress' ? 'EN COURS' : m.status === 'scheduled' ? 'Programmé' : alreadyPlayedAller ? 'ALLER TERMINÉ — RETOUR EN ATTENTE' : m.status}
-                </span>
-              </p>
-              {isFinal && alreadyPlayedAller && <p className="text-[11px] text-ink-600 mt-1.5">Aller joué : {m.score1} - {m.score2}</p>}
+          <div key={m.id} className="card overflow-hidden">
+            {/* En-tête : joueurs + statut */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 bg-ink-800/60 border-b border-ink-700">
+              <div>
+                <p className="text-sm font-bold text-ink-950">{m.player1?.pseudo || '—'} <span className="text-ink-600 font-normal">vs</span> {m.player2?.pseudo || '—'}</p>
+                <p className="text-xs text-ink-600 flex items-center gap-1.5 mt-1">
+                  <Clock size={11} /> {m.round_label || m.phase} · {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString('fr-FR') : 'sans horaire'}
+                </p>
+              </div>
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-wide ${statusPill.className}`}>
+                {statusPill.text}
+              </span>
             </div>
 
-            {isFinal ? (
-              !alreadyPlayedAller ? (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match aller</p>
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <label className="text-[11px] text-ink-600">Kills J1
-                      <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
-                    <label className="text-[11px] text-ink-600">Kills J2
-                      <input type="number" min="0" value={m.score2} onChange={(e) => patch(m.id, { score2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
-                    <label className="text-[11px] text-ink-600">Dégâts J1
-                      <input type="number" min="0" value={m.damage1} onChange={(e) => patch(m.id, { damage1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
-                    <label className="text-[11px] text-ink-600">Dégâts J2
-                      <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
+            {/* Corps : saisie des scores */}
+            <div className="p-5">
+              {isFinal ? (
+                !alreadyPlayedAller ? (
+                  <div className="rounded-xl border border-ink-700 bg-ink-800/40 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-ink-600 mb-3">Match aller</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <label className="text-[11px] text-ink-600 font-semibold">Kills J1
+                        <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                      </label>
+                      <label className="text-[11px] text-ink-600 font-semibold">Kills J2
+                        <input type="number" min="0" value={m.score2} onChange={(e) => patch(m.id, { score2: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                      </label>
+                      <label className="text-[11px] text-ink-600 font-semibold">Dégâts J1
+                        <input type="number" min="0" value={m.damage1} onChange={(e) => patch(m.id, { damage1: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                      </label>
+                      <label className="text-[11px] text-ink-600 font-semibold">Dégâts J2
+                        <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                      </label>
+                    </div>
+                    <p className="text-[11px] text-ink-600 italic mt-3">Le formulaire du retour (date + score) apparaîtra ici une fois l'aller validé.</p>
                   </div>
-                  <p className="text-[11px] text-ink-600 italic mt-2">Le formulaire du retour (date + score) apparaîtra ici une fois l’aller validé.</p>
-                </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-ink-700 bg-ink-800/40 px-4 py-3 flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-600">Aller joué</span>
+                      <span className="font-display text-lg text-ink-950">{m.score1} — {m.score2}</span>
+                    </div>
+
+                    <div className="rounded-xl border border-charo-orange/25 bg-charo-orange/[0.04] p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-charo-orange mb-3">Match retour</p>
+
+                      <div className="flex flex-wrap items-end gap-2 mb-4">
+                        <label className="text-[11px] text-ink-600 font-semibold flex-1 min-w-[200px]">Date &amp; heure du retour
+                          <input type="datetime-local" value={toDatetimeLocalValue(m.scheduled_at_retour)} onChange={(e) => patch(m.id, { scheduled_at_retour: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 py-2 px-3 text-sm outline-none focus:border-charo-orange" />
+                        </label>
+                        <button onClick={() => scheduleRetour(m)} disabled={savingId === m.id} className="rounded-lg border border-charo-orange/40 bg-charo-orange/10 text-charo-orange text-xs font-bold px-3 py-2.5 hover:bg-charo-orange/20 transition-colors disabled:opacity-50 whitespace-nowrap">
+                          Enregistrer la date
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <label className="text-[11px] text-ink-600 font-semibold">Kills J1
+                          <input type="number" min="0" value={m.score1_retour || 0} onChange={(e) => patch(m.id, { score1_retour: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                        </label>
+                        <label className="text-[11px] text-ink-600 font-semibold">Kills J2
+                          <input type="number" min="0" value={m.score2_retour || 0} onChange={(e) => patch(m.id, { score2_retour: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                        </label>
+                        <label className="text-[11px] text-ink-600 font-semibold">Dégâts J1
+                          <input type="number" min="0" value={m.damage1_retour || 0} onChange={(e) => patch(m.id, { damage1_retour: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                        </label>
+                        <label className="text-[11px] text-ink-600 font-semibold">Dégâts J2
+                          <input type="number" min="0" value={m.damage2_retour || 0} onChange={(e) => patch(m.id, { damage2_retour: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                        </label>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-4 pt-3 border-t border-charo-orange/15">
+                        <span className="text-xs text-ink-600 font-semibold">Cumul si validé</span>
+                        <span className="font-display text-xl text-charo-orange">{total1} — {total2}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
               ) : (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match retour</p>
-                  <label className="text-[11px] text-ink-600 block mb-2">Date &amp; heure du retour
-                    <input type="datetime-local" value={m.scheduled_at_retour ? new Date(m.scheduled_at_retour).toISOString().slice(0, 16) : ''} onChange={(e) => patch(m.id, { scheduled_at_retour: e.target.value })} className="mt-1 rounded-lg bg-ink-800 border border-ink-700 py-2 px-2 text-sm outline-none focus:border-charo-orange block" />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <label className="text-[11px] text-ink-600 font-semibold">Kills J1
+                    <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
                   </label>
-                  <button onClick={() => scheduleRetour(m)} disabled={savingId === m.id} className="rank-action text-xs px-3 py-1.5 mb-3">Enregistrer la date du retour</button>
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <label className="text-[11px] text-ink-600">Kills J1
-                      <input type="number" min="0" value={m.score1_retour || 0} onChange={(e) => patch(m.id, { score1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
-                    <label className="text-[11px] text-ink-600">Kills J2
-                      <input type="number" min="0" value={m.score2_retour || 0} onChange={(e) => patch(m.id, { score2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
-                    <label className="text-[11px] text-ink-600">Dégâts J1
-                      <input type="number" min="0" value={m.damage1_retour || 0} onChange={(e) => patch(m.id, { damage1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
-                    <label className="text-[11px] text-ink-600">Dégâts J2
-                      <input type="number" min="0" value={m.damage2_retour || 0} onChange={(e) => patch(m.id, { damage2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                    </label>
-                  </div>
-                  <p className="text-[11px] text-charo-orange font-semibold mt-1.5">Cumul si validé : {total1} - {total2}</p>
+                  <label className="text-[11px] text-ink-600 font-semibold">Kills J2
+                    <input type="number" min="0" value={m.score2} onChange={(e) => patch(m.id, { score2: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                  </label>
+                  <label className="text-[11px] text-ink-600 font-semibold">Dégâts J1
+                    <input type="number" min="0" value={m.damage1} onChange={(e) => patch(m.id, { damage1: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                  </label>
+                  <label className="text-[11px] text-ink-600 font-semibold">Dégâts J2
+                    <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-full rounded-lg bg-ink-900 border border-ink-700 text-center py-2 text-sm font-semibold outline-none focus:border-charo-orange" />
+                  </label>
                 </div>
-              )
-            ) : (
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <label className="text-[11px] text-ink-600">Kills J1
-                  <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                </label>
-                <label className="text-[11px] text-ink-600">Kills J2
-                  <input type="number" min="0" value={m.score2} onChange={(e) => patch(m.id, { score2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                </label>
-                <label className="text-[11px] text-ink-600">Dégâts J1
-                  <input type="number" min="0" value={m.damage1} onChange={(e) => patch(m.id, { damage1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                </label>
-                <label className="text-[11px] text-ink-600">Dégâts J2
-                  <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                </label>
-              </div>
-            )}
+              )}
+            </div>
 
-            <button onClick={() => toggleFeatured(m)} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${m.is_featured ? 'bg-charo-orange/15 border-charo-orange/40 text-charo-orange' : 'border-ink-700 text-ink-600 hover:text-ink-950'}`}>
-              <Star size={13} fill={m.is_featured ? 'currentColor' : 'none'} /> À la une
-            </button>
+            {/* Pied : actions */}
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-ink-700 bg-ink-800/30">
+              <button onClick={() => toggleFeatured(m)} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${m.is_featured ? 'bg-charo-orange/15 border-charo-orange/40 text-charo-orange' : 'border-ink-700 text-ink-600 hover:text-ink-950'}`}>
+                <Star size={13} fill={m.is_featured ? 'currentColor' : 'none'} /> À la une
+              </button>
 
-            <button
-              onClick={() => (isFinal ? (alreadyPlayedAller ? validateRetour(m) : validateAller(m)) : validatePoule(m))}
-              disabled={savingId === m.id}
-              className="ml-auto flex items-center gap-1.5 rounded-lg bg-charo-gradient text-white text-xs font-bold px-4 py-2.5 hover:brightness-110 disabled:opacity-50 transition-all"
-            >
-              {savingId === m.id ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-              {isFinal ? (alreadyPlayedAller ? 'Valider le retour' : 'Valider l’aller') : 'Valider le résultat'}
-            </button>
+              <button
+                onClick={() => (isFinal ? (alreadyPlayedAller ? validateRetour(m) : validateAller(m)) : validatePoule(m))}
+                disabled={savingId === m.id}
+                className="flex items-center gap-1.5 rounded-lg bg-charo-gradient text-white text-xs font-bold px-4 py-2.5 hover:brightness-110 disabled:opacity-50 transition-all"
+              >
+                {savingId === m.id ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                {isFinal ? (alreadyPlayedAller ? 'Valider le retour' : 'Valider l\u2019aller') : 'Valider le résultat'}
+              </button>
+            </div>
           </div>
         )})}
       </div>
@@ -995,3 +1026,4 @@ function AnnouncementsSection({ announcements, authorId, onChanged, setError, se
     </div>
   )
 }
+

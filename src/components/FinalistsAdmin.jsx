@@ -4,13 +4,14 @@ import {
   Edit3, GripVertical, Plus, Save, Trash2, Trophy, Users, X, Zap,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { phaseLabel, phaseShortLabel } from '../config/phaseLabels'
 
 const PHASES = [
-  { key: 'trente_deuxieme', label: '16èmes de finale', short: '16èmes', count: 16, previous: null },
-  { key: 'seizieme', label: 'Huitièmes de finale', short: 'Huitièmes', count: 8, previous: 'trente_deuxieme' },
-  { key: 'quart', label: 'Quarts de finale', short: 'Quarts', count: 4, previous: 'seizieme' },
-  { key: 'demie', label: 'Demi-finales', short: 'Demies', count: 2, previous: 'quart' },
-  { key: 'finale', label: 'Grande finale', short: 'Finale', count: 1, previous: 'demie' },
+  { key: 'trente_deuxieme', label: phaseLabel('trente_deuxieme'), short: phaseShortLabel('trente_deuxieme'), count: 16, previous: null },
+  { key: 'seizieme', label: phaseLabel('seizieme'), short: phaseShortLabel('seizieme'), count: 8, previous: 'trente_deuxieme' },
+  { key: 'quart', label: phaseLabel('quart'), short: phaseShortLabel('quart'), count: 4, previous: 'seizieme' },
+  { key: 'demie', label: phaseLabel('demie'), short: phaseShortLabel('demie'), count: 2, previous: 'quart' },
+  { key: 'finale', label: phaseLabel('finale'), short: phaseShortLabel('finale'), count: 1, previous: 'demie' },
 ]
 const NB_FINALISTES = 32
 
@@ -186,6 +187,10 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
     else { setMessage('Match supprimé. Tu peux réutiliser immédiatement son emplacement.'); await load(); onChanged?.() }
   }
 
+  // Le statut, le vainqueur et la propagation au tour suivant sont
+  // désormais 100% automatiques (triggers en base) : on se contente
+  // d'enregistrer les champs remplis, le système déduit le reste tout seul.
+
   const validateAller = async (m, values) => {
     const score1 = Number(values.score1)
     const score2 = Number(values.score2)
@@ -196,17 +201,15 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
       return
     }
     setError(''); setMessage('')
-    const { error } = await supabase.rpc('admin_validate_aller', {
-      p_match_id: m.id, p_score1: score1, p_score2: score2, p_damage1: damage1, p_damage2: damage2,
-    })
+    const { error } = await supabase.from('matches').update({ score1, score2, damage1, damage2, aller_validated: true }).eq('id', m.id)
     if (error) setError(error.message)
-    else { setMessage('Match aller validé. Programme et valide le retour pour déterminer le qualifié.'); await load(); onChanged?.() }
+    else { setMessage('Match aller enregistré. Programme puis renseigne le retour pour déterminer le qualifié.'); await load(); onChanged?.() }
   }
 
   const scheduleRetour = async (m, scheduledAt) => {
     if (!scheduledAt) { setError('Choisis une date pour le match retour.'); return }
     setError(''); setMessage('')
-    const { error } = await supabase.rpc('admin_schedule_retour', { p_match_id: m.id, p_scheduled_at: new Date(scheduledAt).toISOString() })
+    const { error } = await supabase.from('matches').update({ scheduled_at_retour: new Date(scheduledAt).toISOString() }).eq('id', m.id)
     if (error) setError(error.message)
     else { setMessage('Date du match retour enregistrée.'); await load(); onChanged?.() }
   }
@@ -222,15 +225,14 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
     }
     const total1 = Number(m.score1 || 0) + score1_retour
     const total2 = Number(m.score2 || 0) + score2_retour
-    if (total1 === total2) { setError(`Égalité sur le cumul aller + retour (${total1} - ${total2}) : impossible de déterminer le qualifié.`); return }
     setError(''); setMessage('')
-    const { error } = await supabase.rpc('admin_validate_retour', {
-      p_match_id: m.id, p_score1_retour: score1_retour, p_score2_retour: score2_retour, p_damage1_retour: damage1_retour, p_damage2_retour: damage2_retour,
-    })
-    if (error) setError(error.message)
+    const { error } = await supabase.from('matches').update({
+      score1_retour, score2_retour, damage1_retour, damage2_retour, retour_validated: true,
+    }).eq('id', m.id)
+    if (error) setError(error.message) // ex: égalité cumulée, bloquée par la base elle-même
     else {
       const winner = total1 > total2 ? m.player1?.pseudo : m.player2?.pseudo
-      setMessage(`Retour validé (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance automatiquement dans le prochain emplacement du bracket.`)
+      setMessage(`Retour enregistré (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance automatiquement dans le prochain emplacement du bracket.`)
       await load(); onChanged?.()
     }
   }

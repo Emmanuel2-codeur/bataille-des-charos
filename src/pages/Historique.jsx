@@ -3,16 +3,9 @@ import { CalendarClock, History, RefreshCw } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
+import { PHASE_LABELS as phaseLabels, FINAL_PHASES } from '../config/phaseLabels'
 
-const phaseLabels = {
-  poule: 'Poule',
-  trente_deuxieme: '16ème',
-  seizieme: 'Huitième',
-  quart: 'Quart',
-  demie: 'Demi-finale',
-  finale: 'Finale',
-}
-const FINAL_PHASES = ['trente_deuxieme', 'seizieme', 'quart', 'demie', 'finale']
+const PHASE_ORDER = ['poule', ...FINAL_PHASES]
 
 const dateKey = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : 'sans-date')
 const dateLabel = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Date à confirmer')
