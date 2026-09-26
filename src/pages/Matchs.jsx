@@ -34,6 +34,19 @@ const typeMeta = {
 function effectiveStatus(match, now = Date.now()) {
   if (match.status === 'in_progress') return 'in_progress'
 
+  if (match.status === 'aller_completed') {
+    // Le match retour est ce qui reste "à venir" ici — on juge sa date à
+    // partir de scheduled_at_retour, pas de la date de l'aller (déjà joué).
+    if (
+      match.scheduled_at_retour &&
+      new Date(match.scheduled_at_retour).getTime() <= now &&
+      !match.status_override
+    ) {
+      return 'in_progress'
+    }
+    return 'scheduled'
+  }
+
   if (
     match.status === 'scheduled' &&
     match.scheduled_at &&
@@ -95,10 +108,13 @@ export default function Matchs() {
         round_label,
         match_type,
         scheduled_at,
+        scheduled_at_retour,
         status,
         status_override,
         score1,
         score2,
+        score1_retour,
+        score2_retour,
         damage1,
         damage2,
         player1:profiles!matches_player1_id_fkey (
@@ -113,7 +129,7 @@ export default function Matchs() {
           name
         )
       `)
-      .in('status', ['scheduled', 'in_progress'])
+      .in('status', ['scheduled', 'in_progress', 'aller_completed'])
       .order('scheduled_at', {
         ascending: true,
         nullsFirst: false,
@@ -160,6 +176,8 @@ export default function Matchs() {
     () =>
       matches.map((match) => ({
         ...match,
+        isRetourLeg: match.status === 'aller_completed',
+        displayDate: match.status === 'aller_completed' ? match.scheduled_at_retour : match.scheduled_at,
         status: effectiveStatus(match, now),
       })),
     [matches, now]
@@ -179,8 +197,8 @@ export default function Matchs() {
         if (statusDiff !== 0) return statusDiff
 
         return (
-          new Date(a.scheduled_at || '2999-01-01') -
-          new Date(b.scheduled_at || '2999-01-01')
+          new Date(a.displayDate || '2999-01-01') -
+          new Date(b.displayDate || '2999-01-01')
         )
       }),
     [mapped]
@@ -418,6 +436,11 @@ export default function Matchs() {
                                     <p className="text-sm text-ink-600 mt-1">
                                       {match.round_label ||
                                         'Rencontre'}
+                                      {match.isRetourLeg && (
+                                        <span className="ml-2 inline-flex items-center rounded-full border border-charo-orange/40 bg-charo-orange/10 text-charo-orange text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 align-middle">
+                                          Match retour
+                                        </span>
+                                      )}
                                     </p>
                                   </div>
 
@@ -484,7 +507,7 @@ export default function Matchs() {
                                   <span className="text-xs font-semibold text-ink-600">
                                     🕐{' '}
                                     {formatDate(
-                                      match.scheduled_at
+                                      match.displayDate
                                     )}
                                   </span>
 
@@ -493,6 +516,15 @@ export default function Matchs() {
                                 {/* SCORE EN COURS */}
                                 {status ===
                                   'in_progress' &&
+                                  match.isRetourLeg && (
+                                    <div className="mt-4 rounded-xl bg-ink-800 border border-ink-700 px-4 py-3 text-center text-sm font-bold text-ink-950">
+                                      Aller joué : {match.score1 ?? 0} — {match.score2 ?? 0} · Retour en cours
+                                    </div>
+                                  )}
+
+                                {status ===
+                                  'in_progress' &&
+                                  !match.isRetourLeg &&
                                   (match.score1 !==
                                     null ||
                                     match.score2 !==

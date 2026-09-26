@@ -576,52 +576,74 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
     if (!error) onSaved()
   }
 
-  const validate = async (m) => {
+  const validateAller = async (m) => {
     setSavingId(m.id); setError(''); setMessage('')
-
     const score1 = Number(m.score1)
     const score2 = Number(m.score2)
     const damage1 = Number(m.damage1 || 0)
     const damage2 = Number(m.damage2 || 0)
-    const isFinal = FINAL_PHASES.includes(m.phase)
-    const score1_retour = Number(m.score1_retour || 0)
-    const score2_retour = Number(m.score2_retour || 0)
-    const damage1_retour = Number(m.damage1_retour || 0)
-    const damage2_retour = Number(m.damage2_retour || 0)
-
-    const baseNums = [score1, score2, damage1, damage2]
-    const retourNums = isFinal ? [score1_retour, score2_retour, damage1_retour, damage2_retour] : []
-    if (![...baseNums, ...retourNums].every(Number.isFinite) || [...baseNums, ...retourNums].some(v => v < 0)) {
+    if (![score1, score2, damage1, damage2].every(Number.isFinite) || [score1, score2, damage1, damage2].some(v => v < 0)) {
       setError('Les scores et dégâts doivent être des nombres positifs.')
       setSavingId(null)
       return
     }
-    if (isFinal) {
-      const total1 = score1 + score1_retour
-      const total2 = score2 + score2_retour
-      if (total1 === total2) {
-        setError(`Égalité sur le cumul aller + retour (${total1} - ${total2}) : impossible de déterminer le joueur qui avance.`)
-        setSavingId(null)
-        return
-      }
-      const { error } = await supabase.rpc('admin_validate_final_match', {
-        p_match_id: m.id, p_score1: score1, p_score2: score2, p_damage1: damage1, p_damage2: damage2,
-        p_score1_retour: score1_retour, p_score2_retour: score2_retour, p_damage1_retour: damage1_retour, p_damage2_retour: damage2_retour,
-      })
-      if (error) setError(error.message)
-      else {
-        const winner = total1 > total2 ? m.player1?.pseudo : m.player2?.pseudo
-        setMessage(`Résultat validé (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance vers la prochaine case du bracket.`)
-        onSaved()
-      }
-    } else {
-      const { error } = await supabase.from('matches').update({ score1, score2, damage1, damage2, status: 'completed' }).eq('id', m.id)
-      if (error) setError(error.message)
-      else {
-        setMessage('Match validé — kills, dégâts et classement mis à jour, match déplacé dans l’Historique.')
-        onSaved()
-      }
+    const { error } = await supabase.rpc('admin_validate_aller', { p_match_id: m.id, p_score1: score1, p_score2: score2, p_damage1: damage1, p_damage2: damage2 })
+    if (error) setError(error.message)
+    else { setMessage('Match aller validé. Programme et valide le retour pour déterminer le qualifié.'); onSaved() }
+    setSavingId(null)
+  }
+
+  const scheduleRetour = async (m) => {
+    if (!m.scheduled_at_retour) { setError('Choisis une date pour le match retour.'); return }
+    setSavingId(m.id); setError(''); setMessage('')
+    const { error } = await supabase.rpc('admin_schedule_retour', { p_match_id: m.id, p_scheduled_at: new Date(m.scheduled_at_retour).toISOString() })
+    if (error) setError(error.message)
+    else { setMessage('Date du match retour enregistrée.'); onSaved() }
+    setSavingId(null)
+  }
+
+  const validateRetour = async (m) => {
+    setSavingId(m.id); setError(''); setMessage('')
+    const score1_retour = Number(m.score1_retour || 0)
+    const score2_retour = Number(m.score2_retour || 0)
+    const damage1_retour = Number(m.damage1_retour || 0)
+    const damage2_retour = Number(m.damage2_retour || 0)
+    if (![score1_retour, score2_retour, damage1_retour, damage2_retour].every(Number.isFinite) || [score1_retour, score2_retour, damage1_retour, damage2_retour].some(v => v < 0)) {
+      setError('Les scores et dégâts du retour doivent être des nombres positifs.')
+      setSavingId(null)
+      return
     }
+    const total1 = Number(m.score1 || 0) + score1_retour
+    const total2 = Number(m.score2 || 0) + score2_retour
+    if (total1 === total2) {
+      setError(`Égalité sur le cumul aller + retour (${total1} - ${total2}) : impossible de déterminer le joueur qui avance.`)
+      setSavingId(null)
+      return
+    }
+    const { error } = await supabase.rpc('admin_validate_retour', { p_match_id: m.id, p_score1_retour: score1_retour, p_score2_retour: score2_retour, p_damage1_retour: damage1_retour, p_damage2_retour: damage2_retour })
+    if (error) setError(error.message)
+    else {
+      const winner = total1 > total2 ? m.player1?.pseudo : m.player2?.pseudo
+      setMessage(`Retour validé (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance vers la prochaine case du bracket.`)
+      onSaved()
+    }
+    setSavingId(null)
+  }
+
+  const validatePoule = async (m) => {
+    setSavingId(m.id); setError(''); setMessage('')
+    const score1 = Number(m.score1)
+    const score2 = Number(m.score2)
+    const damage1 = Number(m.damage1 || 0)
+    const damage2 = Number(m.damage2 || 0)
+    if (![score1, score2, damage1, damage2].every(Number.isFinite) || [score1, score2, damage1, damage2].some(v => v < 0)) {
+      setError('Les scores et dégâts doivent être des nombres positifs.')
+      setSavingId(null)
+      return
+    }
+    const { error } = await supabase.from('matches').update({ score1, score2, damage1, damage2, status: 'completed' }).eq('id', m.id)
+    if (error) setError(error.message)
+    else { setMessage('Match validé — kills, dégâts et classement mis à jour, match déplacé dans l’Historique.'); onSaved() }
     setSavingId(null)
   }
 
@@ -641,6 +663,7 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
         {nonCompleted.length === 0 && <p className="p-6 text-sm text-ink-600">Aucun match à valider pour l'instant.</p>}
         {nonCompleted.map((m) => {
           const isFinal = FINAL_PHASES.includes(m.phase)
+          const alreadyPlayedAller = m.status === 'aller_completed'
           const total1 = Number(m.score1 || 0) + (isFinal ? Number(m.score1_retour || 0) : 0)
           const total2 = Number(m.score2 || 0) + (isFinal ? Number(m.score2_retour || 0) : 0)
           return (
@@ -649,13 +672,58 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
               <p className="text-sm font-semibold">{m.player1?.pseudo || '—'} <span className="text-ink-600">vs</span> {m.player2?.pseudo || '—'}</p>
               <p className="text-xs text-ink-600 flex items-center gap-1.5 mt-1">
                 <Clock size={11} /> {m.round_label || m.phase} · {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString('fr-FR') : 'sans horaire'} ·{' '}
-                <span className={m.status === 'in_progress' ? 'text-live font-bold' : ''}>{m.status === 'in_progress' ? 'EN COURS' : m.status === 'scheduled' ? 'Programmé' : m.status}</span>
+                <span className={m.status === 'in_progress' ? 'text-live font-bold' : alreadyPlayedAller ? 'text-charo-orange font-bold' : ''}>
+                  {m.status === 'in_progress' ? 'EN COURS' : m.status === 'scheduled' ? 'Programmé' : alreadyPlayedAller ? 'ALLER TERMINÉ — RETOUR EN ATTENTE' : m.status}
+                </span>
               </p>
-              {isFinal && <p className="text-[11px] text-charo-orange font-semibold mt-1.5">Cumul aller + retour : {total1} - {total2}</p>}
+              {isFinal && alreadyPlayedAller && <p className="text-[11px] text-ink-600 mt-1.5">Aller joué : {m.score1} - {m.score2}</p>}
             </div>
 
-            <div>
-              {isFinal && <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match aller</p>}
+            {isFinal ? (
+              !alreadyPlayedAller ? (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match aller</p>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <label className="text-[11px] text-ink-600">Kills J1
+                      <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                    <label className="text-[11px] text-ink-600">Kills J2
+                      <input type="number" min="0" value={m.score2} onChange={(e) => patch(m.id, { score2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                    <label className="text-[11px] text-ink-600">Dégâts J1
+                      <input type="number" min="0" value={m.damage1} onChange={(e) => patch(m.id, { damage1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                    <label className="text-[11px] text-ink-600">Dégâts J2
+                      <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-ink-600 italic mt-2">Le formulaire du retour (date + score) apparaîtra ici une fois l’aller validé.</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match retour</p>
+                  <label className="text-[11px] text-ink-600 block mb-2">Date &amp; heure du retour
+                    <input type="datetime-local" value={m.scheduled_at_retour ? new Date(m.scheduled_at_retour).toISOString().slice(0, 16) : ''} onChange={(e) => patch(m.id, { scheduled_at_retour: e.target.value })} className="mt-1 rounded-lg bg-ink-800 border border-ink-700 py-2 px-2 text-sm outline-none focus:border-charo-orange block" />
+                  </label>
+                  <button onClick={() => scheduleRetour(m)} disabled={savingId === m.id} className="rank-action text-xs px-3 py-1.5 mb-3">Enregistrer la date du retour</button>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <label className="text-[11px] text-ink-600">Kills J1
+                      <input type="number" min="0" value={m.score1_retour || 0} onChange={(e) => patch(m.id, { score1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                    <label className="text-[11px] text-ink-600">Kills J2
+                      <input type="number" min="0" value={m.score2_retour || 0} onChange={(e) => patch(m.id, { score2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                    <label className="text-[11px] text-ink-600">Dégâts J1
+                      <input type="number" min="0" value={m.damage1_retour || 0} onChange={(e) => patch(m.id, { damage1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                    <label className="text-[11px] text-ink-600">Dégâts J2
+                      <input type="number" min="0" value={m.damage2_retour || 0} onChange={(e) => patch(m.id, { damage2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-charo-orange font-semibold mt-1.5">Cumul si validé : {total1} - {total2}</p>
+                </div>
+              )
+            ) : (
               <div className="grid grid-cols-2 gap-2 text-center">
                 <label className="text-[11px] text-ink-600">Kills J1
                   <input type="number" min="0" value={m.score1} onChange={(e) => patch(m.id, { score1: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
@@ -670,35 +738,19 @@ function ValidateScoreSection({ matches, onSaved, setError, setMessage }) {
                   <input type="number" min="0" value={m.damage2} onChange={(e) => patch(m.id, { damage2: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
                 </label>
               </div>
-            </div>
-
-            {isFinal && (
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Match retour</p>
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <label className="text-[11px] text-ink-600">Kills J1
-                    <input type="number" min="0" value={m.score1_retour || 0} onChange={(e) => patch(m.id, { score1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                  </label>
-                  <label className="text-[11px] text-ink-600">Kills J2
-                    <input type="number" min="0" value={m.score2_retour || 0} onChange={(e) => patch(m.id, { score2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                  </label>
-                  <label className="text-[11px] text-ink-600">Dégâts J1
-                    <input type="number" min="0" value={m.damage1_retour || 0} onChange={(e) => patch(m.id, { damage1_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                  </label>
-                  <label className="text-[11px] text-ink-600">Dégâts J2
-                    <input type="number" min="0" value={m.damage2_retour || 0} onChange={(e) => patch(m.id, { damage2_retour: e.target.value })} className="mt-1 w-20 rounded-lg bg-ink-800 border border-ink-700 text-center py-2 text-sm outline-none focus:border-charo-orange" />
-                  </label>
-                </div>
-              </div>
             )}
 
             <button onClick={() => toggleFeatured(m)} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors ${m.is_featured ? 'bg-charo-orange/15 border-charo-orange/40 text-charo-orange' : 'border-ink-700 text-ink-600 hover:text-ink-950'}`}>
               <Star size={13} fill={m.is_featured ? 'currentColor' : 'none'} /> À la une
             </button>
 
-            <button onClick={() => validate(m)} disabled={savingId === m.id} className="ml-auto flex items-center gap-1.5 rounded-lg bg-charo-gradient text-white text-xs font-bold px-4 py-2.5 hover:brightness-110 disabled:opacity-50 transition-all">
+            <button
+              onClick={() => (isFinal ? (alreadyPlayedAller ? validateRetour(m) : validateAller(m)) : validatePoule(m))}
+              disabled={savingId === m.id}
+              className="ml-auto flex items-center gap-1.5 rounded-lg bg-charo-gradient text-white text-xs font-bold px-4 py-2.5 hover:brightness-110 disabled:opacity-50 transition-all"
+            >
               {savingId === m.id ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-              Valider le résultat
+              {isFinal ? (alreadyPlayedAller ? 'Valider le retour' : 'Valider l’aller') : 'Valider le résultat'}
             </button>
           </div>
         )})}
@@ -943,4 +995,3 @@ function AnnouncementsSection({ announcements, authorId, onChanged, setError, se
     </div>
   )
 }
-

@@ -300,6 +300,7 @@ table td { color: #1f2937; }
 .match-phase-tag { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; color:#6B7280; }
 .match-status { font-size:8px; font-weight:900; border-radius:999px; padding:4px 7px; background:#F3F4F6; color:#6B7280; }
 .match-status.completed { background:rgba(255,90,31,.1); color:#FF5A1F; }
+.match-status.aller_completed { background:rgba(168,85,247,.1); color:#A855F7; }
 .match-status.in_progress { background:#ecfdf5; color:#059669; }
 .match-player { display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px;border-radius:9px;background:#F8FAFC;font-size:11px;font-weight:700; }
 .match-player.winner { background:rgba(255,90,31,.10);color:#C2410C; }
@@ -372,6 +373,8 @@ table td { color: #1f2937; }
 .bracket-match:hover { transform: translateY(-2px); border-color: #FF8A3D; box-shadow: 0 12px 26px rgba(255,90,31,.14); }
 .bracket-match.is-complete { border-color: rgba(255,90,31,.5); }
 .bracket-match.is-live { border-color: #EF4444; box-shadow: 0 0 0 3px rgba(239,68,68,.08); }
+.bracket-match.is-pending-retour { border-color: #A855F7; box-shadow: 0 0 0 3px rgba(168,85,247,.08); }
+.bracket-match-note { display:block; font-size: 8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#A855F7; margin-bottom:4px; }
 .bracket-match-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 2px; border-radius: 7px; }
 .bracket-match-row + .bracket-match-row { margin-top: 2px; border-top: 1px dashed #F1F5F9; padding-top: 5px; }
 .bracket-match-name { font-size: 11px; font-weight: 700; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -380,6 +383,7 @@ table td { color: #1f2937; }
 .bracket-match-row.is-winner .bracket-match-score { color: #FF5A1F; }
 .bracket-match-pulse { position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 50%; background: #D1D5DB; }
 .bracket-match-pulse.completed { background: #FF5A1F; }
+.bracket-match-pulse.aller_completed { background: #A855F7; }
 .bracket-match-pulse.in_progress { background: #EF4444; box-shadow: 0 0 0 3px rgba(239,68,68,.18); animation: bracket-pulse 1.6s ease-in-out infinite; }
 @keyframes bracket-pulse { 0%,100%{ box-shadow:0 0 0 3px rgba(239,68,68,.18);} 50%{ box-shadow:0 0 0 6px rgba(239,68,68,.08);} }
 

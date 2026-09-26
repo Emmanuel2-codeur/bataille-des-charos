@@ -23,6 +23,7 @@ function fmtDate(value) {
 
 function statusLabel(m) {
   if (m.status === 'completed') return 'Terminé'
+  if (m.status === 'aller_completed') return 'Aller terminé — en attente du retour'
   if (m.status === 'in_progress') return 'En cours'
   return 'Programmé'
 }
@@ -185,38 +186,51 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
     else { setMessage('Match supprimé. Tu peux réutiliser immédiatement son emplacement.'); await load(); onChanged?.() }
   }
 
-  const validateMatch = async (m, values) => {
+  const validateAller = async (m, values) => {
     const score1 = Number(values.score1)
     const score2 = Number(values.score2)
     const damage1 = Math.max(0, Number(values.damage1 || 0))
     const damage2 = Math.max(0, Number(values.damage2 || 0))
-    const score1_retour = Number(values.score1_retour || 0)
-    const score2_retour = Number(values.score2_retour || 0)
-    const damage1_retour = Math.max(0, Number(values.damage1_retour || 0))
-    const damage2_retour = Math.max(0, Number(values.damage2_retour || 0))
-    if (![score1, score2, score1_retour, score2_retour].every(Number.isFinite) || [score1, score2, score1_retour, score2_retour].some(v => v < 0)) {
-      setError('Les scores (aller et retour) doivent être des nombres positifs.')
+    if (![score1, score2].every(Number.isFinite) || [score1, score2].some(v => v < 0)) {
+      setError('Les scores de l’aller doivent être des nombres positifs.')
       return
     }
-    const total1 = score1 + score1_retour
-    const total2 = score2 + score2_retour
+    setError(''); setMessage('')
+    const { error } = await supabase.rpc('admin_validate_aller', {
+      p_match_id: m.id, p_score1: score1, p_score2: score2, p_damage1: damage1, p_damage2: damage2,
+    })
+    if (error) setError(error.message)
+    else { setMessage('Match aller validé. Programme et valide le retour pour déterminer le qualifié.'); await load(); onChanged?.() }
+  }
+
+  const scheduleRetour = async (m, scheduledAt) => {
+    if (!scheduledAt) { setError('Choisis une date pour le match retour.'); return }
+    setError(''); setMessage('')
+    const { error } = await supabase.rpc('admin_schedule_retour', { p_match_id: m.id, p_scheduled_at: new Date(scheduledAt).toISOString() })
+    if (error) setError(error.message)
+    else { setMessage('Date du match retour enregistrée.'); await load(); onChanged?.() }
+  }
+
+  const validateRetour = async (m, values) => {
+    const score1_retour = Number(values.score1_retour)
+    const score2_retour = Number(values.score2_retour)
+    const damage1_retour = Math.max(0, Number(values.damage1_retour || 0))
+    const damage2_retour = Math.max(0, Number(values.damage2_retour || 0))
+    if (![score1_retour, score2_retour].every(Number.isFinite) || [score1_retour, score2_retour].some(v => v < 0)) {
+      setError('Les scores du retour doivent être des nombres positifs.')
+      return
+    }
+    const total1 = Number(m.score1 || 0) + score1_retour
+    const total2 = Number(m.score2 || 0) + score2_retour
     if (total1 === total2) { setError(`Égalité sur le cumul aller + retour (${total1} - ${total2}) : impossible de déterminer le qualifié.`); return }
     setError(''); setMessage('')
-    const { error } = await supabase.rpc('admin_validate_final_match', {
-      p_match_id: m.id,
-      p_score1: score1,
-      p_score2: score2,
-      p_damage1: damage1,
-      p_damage2: damage2,
-      p_score1_retour: score1_retour,
-      p_score2_retour: score2_retour,
-      p_damage1_retour: damage1_retour,
-      p_damage2_retour: damage2_retour,
+    const { error } = await supabase.rpc('admin_validate_retour', {
+      p_match_id: m.id, p_score1_retour: score1_retour, p_score2_retour: score2_retour, p_damage1_retour: damage1_retour, p_damage2_retour: damage2_retour,
     })
     if (error) setError(error.message)
     else {
       const winner = total1 > total2 ? m.player1?.pseudo : m.player2?.pseudo
-      setMessage(`Score validé (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance automatiquement dans le prochain emplacement du bracket.`)
+      setMessage(`Retour validé (cumul ${total1}-${total2}). ${winner || 'Le vainqueur'} avance automatiquement dans le prochain emplacement du bracket.`)
       await load(); onChanged?.()
     }
   }
@@ -339,7 +353,7 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
               <div className="flex items-center justify-between mb-3"><div><p className="text-[10px] uppercase tracking-[.2em] font-extrabold text-charo-orange">{phase.short}</p><h4 className="font-bold">{phase.label}</h4></div><button onClick={() => deletePhase(phase.key)} disabled={!rows.length} className="rank-action danger" title="Supprimer toute la phase"><Trash2 size={13} /></button></div>
               <div className="space-y-3">
                 {slots.map((match, i) => {
-                  if (match) return <AdminBracketMatch key={match.id} match={match} onEdit={editMatch} onDelete={deleteMatch} onValidate={validateMatch} />
+                  if (match) return <AdminBracketMatch key={match.id} match={match} onEdit={editMatch} onDelete={deleteMatch} onValidateAller={validateAller} onScheduleRetour={scheduleRetour} onValidateRetour={validateRetour} />
                   if (phase.previous) {
                     const a = next.find(x => x.position === i * 2 + 1), b = next.find(x => x.position === i * 2 + 2)
                     const ready = a?.ready && b?.ready
@@ -373,40 +387,85 @@ export default function FinalistsAdmin({ players, onChanged, setError, setMessag
   )
 }
 
-function AdminBracketMatch({ match, onEdit, onDelete, onValidate }) {
+function toLocalInputValue(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function AdminBracketMatch({ match, onEdit, onDelete, onValidateAller, onScheduleRetour, onValidateRetour }) {
   const [open, setOpen] = useState(false)
-  const [values, setValues] = useState({
-    score1: match.score1 || 0, score2: match.score2 || 0, damage1: match.damage1 || 0, damage2: match.damage2 || 0,
-    score1_retour: match.score1_retour || 0, score2_retour: match.score2_retour || 0, damage1_retour: match.damage1_retour || 0, damage2_retour: match.damage2_retour || 0,
-  })
+  const [allerValues, setAllerValues] = useState({ score1: match.score1 || 0, score2: match.score2 || 0, damage1: match.damage1 || 0, damage2: match.damage2 || 0 })
+  const [retourValues, setRetourValues] = useState({ score1_retour: match.score1_retour || 0, score2_retour: match.score2_retour || 0, damage1_retour: match.damage1_retour || 0, damage2_retour: match.damage2_retour || 0 })
+  const [retourDate, setRetourDate] = useState(toLocalInputValue(match.scheduled_at_retour))
+
   const winner = match.winner_id ? (match.winner_id === match.player1_id ? match.player1 : match.player2) : null
   const total1 = Number(match.score1 || 0) + Number(match.score1_retour || 0)
   const total2 = Number(match.score2 || 0) + Number(match.score2_retour || 0)
-  return <div className={`admin-bracket-match ${match.status === 'completed' ? 'is-complete' : ''}`}>
+  const alreadyPlayedAller = match.status === 'aller_completed' || match.status === 'completed'
+  const isDone = match.status === 'completed'
+
+  return <div className={`admin-bracket-match ${isDone ? 'is-complete' : ''}`}>
     <button type="button" onClick={() => setOpen(v => !v)} className="w-full text-left">
       <div className="flex items-center justify-between gap-2 mb-2"><span className="match-phase-tag">{match.round_label || 'Match'}</span><span className={`match-status ${match.status}`}>{statusLabel(match)}</span></div>
-      <div className="space-y-1.5"><div className={`match-player ${winner?.id === match.player1_id ? 'winner' : ''}`}><span>{match.player1?.pseudo || 'À définir'}</span><strong>{match.status === 'completed' ? total1 : '—'}</strong></div><div className={`match-player ${winner?.id === match.player2_id ? 'winner' : ''}`}><span>{match.player2?.pseudo || 'À définir'}</span><strong>{match.status === 'completed' ? total2 : '—'}</strong></div></div>
-      <div className="mt-2 text-[10px] text-ink-600 flex items-center gap-1"><CalendarClock size={11} /> {fmtDate(match.scheduled_at)} <span className="ml-auto">{open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</span></div>
+      <div className="space-y-1.5">
+        <div className={`match-player ${winner?.id === match.player1_id ? 'winner' : ''}`}><span>{match.player1?.pseudo || 'À définir'}</span><strong>{isDone ? total1 : alreadyPlayedAller ? match.score1 : '—'}</strong></div>
+        <div className={`match-player ${winner?.id === match.player2_id ? 'winner' : ''}`}><span>{match.player2?.pseudo || 'À définir'}</span><strong>{isDone ? total2 : alreadyPlayedAller ? match.score2 : '—'}</strong></div>
+      </div>
+      <div className="mt-2 text-[10px] text-ink-600 flex items-center gap-1"><CalendarClock size={11} /> Aller : {fmtDate(match.scheduled_at)} <span className="ml-auto">{open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</span></div>
+      {!isDone && <div className="mt-1 text-[10px] text-ink-600 flex items-center gap-1"><CalendarClock size={11} /> Retour : {match.scheduled_at_retour ? fmtDate(match.scheduled_at_retour) : 'à programmer'}</div>}
       <div className="mt-2 text-[9px] font-bold text-charo-orange">● Visible dans le bracket public</div>
     </button>
-    {open && <div className="pt-3 mt-3 border-t border-ink-700 space-y-2" onClick={e => e.stopPropagation()}>
-      {match.status !== 'completed' ? (
-        <>
-          <p className="text-[10px] uppercase tracking-wide text-ink-600">Match aller</p>
-          <div className="grid grid-cols-2 gap-2"><label className="mini-field">Kills J1<input type="number" min="0" value={values.score1} onChange={e => setValues(v => ({ ...v, score1: e.target.value }))} /></label><label className="mini-field">Kills J2<input type="number" min="0" value={values.score2} onChange={e => setValues(v => ({ ...v, score2: e.target.value }))} /></label><label className="mini-field">Dégâts J1<input type="number" min="0" value={values.damage1} onChange={e => setValues(v => ({ ...v, damage1: e.target.value }))} /></label><label className="mini-field">Dégâts J2<input type="number" min="0" value={values.damage2} onChange={e => setValues(v => ({ ...v, damage2: e.target.value }))} /></label></div>
-          <p className="text-[10px] uppercase tracking-wide text-ink-600 pt-1">Match retour</p>
-          <div className="grid grid-cols-2 gap-2"><label className="mini-field">Kills J1<input type="number" min="0" value={values.score1_retour} onChange={e => setValues(v => ({ ...v, score1_retour: e.target.value }))} /></label><label className="mini-field">Kills J2<input type="number" min="0" value={values.score2_retour} onChange={e => setValues(v => ({ ...v, score2_retour: e.target.value }))} /></label><label className="mini-field">Dégâts J1<input type="number" min="0" value={values.damage1_retour} onChange={e => setValues(v => ({ ...v, damage1_retour: e.target.value }))} /></label><label className="mini-field">Dégâts J2<input type="number" min="0" value={values.damage2_retour} onChange={e => setValues(v => ({ ...v, damage2_retour: e.target.value }))} /></label></div>
-          <p className="text-xs font-bold text-charo-orange pt-1">Cumul : {Number(values.score1 || 0) + Number(values.score1_retour || 0)} - {Number(values.score2 || 0) + Number(values.score2_retour || 0)}</p>
-        </>
+
+    {open && <div className="pt-3 mt-3 border-t border-ink-700 space-y-4" onClick={e => e.stopPropagation()}>
+
+      {/* ------- MATCH ALLER ------- */}
+      {!alreadyPlayedAller ? (
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1.5">Match aller — saisie du score</p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="mini-field">Kills J1<input type="number" min="0" value={allerValues.score1} onChange={e => setAllerValues(v => ({ ...v, score1: e.target.value }))} /></label>
+            <label className="mini-field">Kills J2<input type="number" min="0" value={allerValues.score2} onChange={e => setAllerValues(v => ({ ...v, score2: e.target.value }))} /></label>
+            <label className="mini-field">Dégâts J1<input type="number" min="0" value={allerValues.damage1} onChange={e => setAllerValues(v => ({ ...v, damage1: e.target.value }))} /></label>
+            <label className="mini-field">Dégâts J2<input type="number" min="0" value={allerValues.damage2} onChange={e => setAllerValues(v => ({ ...v, damage2: e.target.value }))} /></label>
+          </div>
+          <button onClick={() => onValidateAller(match, allerValues)} className="btn-primary w-full !py-2 !px-3 text-xs mt-2"><Check size={13} /> Valider l’aller</button>
+        </div>
       ) : (
         <div className="rounded-xl bg-ink-800 p-3 text-xs">
-          <strong>Aller :</strong> {match.score1} — {match.score2}<br />
-          <strong>Retour :</strong> {match.score1_retour ?? 0} — {match.score2_retour ?? 0}<br />
-          <strong>Dégâts :</strong> {Number(match.damage1 || 0) + Number(match.damage1_retour || 0)} — {Number(match.damage2 || 0) + Number(match.damage2_retour || 0)}<br />
+          <strong>Aller (validé) :</strong> {match.score1} — {match.score2} · {match.damage1} — {match.damage2} dégâts
+        </div>
+      )}
+
+      {/* ------- MATCH RETOUR : n'apparaît qu'une fois l'aller validé ------- */}
+      {alreadyPlayedAller && !isDone && (
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-ink-600 mb-1.5">Match retour</p>
+          <div className="flex items-end gap-2 mb-2">
+            <label className="mini-field flex-1">Date &amp; heure<input type="datetime-local" value={retourDate} onChange={e => setRetourDate(e.target.value)} /></label>
+            <button onClick={() => onScheduleRetour(match, retourDate)} className="rank-action !h-9 !w-9"><CalendarClock size={14} /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="mini-field">Kills J1<input type="number" min="0" value={retourValues.score1_retour} onChange={e => setRetourValues(v => ({ ...v, score1_retour: e.target.value }))} /></label>
+            <label className="mini-field">Kills J2<input type="number" min="0" value={retourValues.score2_retour} onChange={e => setRetourValues(v => ({ ...v, score2_retour: e.target.value }))} /></label>
+            <label className="mini-field">Dégâts J1<input type="number" min="0" value={retourValues.damage1_retour} onChange={e => setRetourValues(v => ({ ...v, damage1_retour: e.target.value }))} /></label>
+            <label className="mini-field">Dégâts J2<input type="number" min="0" value={retourValues.damage2_retour} onChange={e => setRetourValues(v => ({ ...v, damage2_retour: e.target.value }))} /></label>
+          </div>
+          <p className="text-xs font-bold text-charo-orange pt-1">Cumul si validé : {Number(match.score1 || 0) + Number(retourValues.score1_retour || 0)} - {Number(match.score2 || 0) + Number(retourValues.score2_retour || 0)}</p>
+          <button onClick={() => onValidateRetour(match, retourValues)} className="btn-primary w-full !py-2 !px-3 text-xs mt-1"><Check size={13} /> Valider le retour (cumul → bracket)</button>
+        </div>
+      )}
+
+      {isDone && (
+        <div className="rounded-xl bg-ink-800 p-3 text-xs">
+          <strong>Retour :</strong> {match.score1_retour ?? 0} — {match.score2_retour ?? 0} · {Number(match.damage1_retour || 0)} — {Number(match.damage2_retour || 0)} dégâts<br />
+          <strong>Cumul final :</strong> {total1} — {total2}<br />
           <strong>Règle :</strong> {match.match_type === 'onetap' ? 'One Tap / Headshot Only' : 'Spam / Bodyshot'}
         </div>
       )}
-      <div className="flex gap-2 pt-1"><button onClick={() => onEdit(match)} className="rank-action"><Edit3 size={13} /></button><button onClick={() => onDelete(match)} className="rank-action danger"><Trash2 size={13} /></button>{match.status !== 'completed' && <button onClick={() => onValidate(match, values)} className="btn-primary flex-1 !py-2 !px-3 text-xs"><Check size={13} /> Valider le score</button>}</div>
+
+      <div className="flex gap-2 pt-1"><button onClick={() => onEdit(match)} className="rank-action"><Edit3 size={13} /></button><button onClick={() => onDelete(match)} className="rank-action danger"><Trash2 size={13} /></button></div>
     </div>}
   </div>
 }

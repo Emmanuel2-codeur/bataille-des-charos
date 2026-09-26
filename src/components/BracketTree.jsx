@@ -36,19 +36,21 @@ function MiniMatchCard({ match, onSelect }) {
   const p2 = match.player2?.pseudo || 'À déterminer'
   const winner = match.winner_id === match.player1_id ? 1 : match.winner_id === match.player2_id ? 2 : null
   const [total1, total2] = cumulative(match)
+  const showScore = match.status !== 'scheduled'
   return (
     <button
       type="button"
-      className={`bracket-match ${match.status === 'completed' ? 'is-complete' : ''} ${match.status === 'in_progress' ? 'is-live' : ''}`}
+      className={`bracket-match ${match.status === 'completed' ? 'is-complete' : ''} ${match.status === 'in_progress' ? 'is-live' : ''} ${match.status === 'aller_completed' ? 'is-pending-retour' : ''}`}
       onClick={() => onSelect?.(match)}
     >
+      {match.status === 'aller_completed' && <span className="bracket-match-note">Aller terminé — en attente du retour</span>}
       <div className={`bracket-match-row ${winner === 1 ? 'is-winner' : ''}`}>
         <span className="bracket-match-name">{p1}</span>
-        <strong className="bracket-match-score">{match.status === 'scheduled' ? '—' : total1}</strong>
+        <strong className="bracket-match-score">{showScore ? (match.status === 'aller_completed' ? match.score1 : total1) : '—'}</strong>
       </div>
       <div className={`bracket-match-row ${winner === 2 ? 'is-winner' : ''}`}>
         <span className="bracket-match-name">{p2}</span>
-        <strong className="bracket-match-score">{match.status === 'scheduled' ? '—' : total2}</strong>
+        <strong className="bracket-match-score">{showScore ? (match.status === 'aller_completed' ? match.score2 : total2) : '—'}</strong>
       </div>
       <span className={`bracket-match-pulse ${match.status}`} />
     </button>
@@ -189,7 +191,7 @@ export function BracketDetails({ match, onClose }) {
   const p1 = match.player1?.pseudo || 'À déterminer'
   const p2 = match.player2?.pseudo || 'À déterminer'
   const winner = match.winner_id === match.player1_id ? p1 : match.winner_id === match.player2_id ? p2 : null
-  const hasRetour = match.score1_retour != null || match.score2_retour != null
+  const hasRetour = ['trente_deuxieme','seizieme','quart','demie','finale'].includes(match.phase)
   const total1 = Number(match.score1 || 0) + Number(match.score1_retour || 0)
   const total2 = Number(match.score2 || 0) + Number(match.score2_retour || 0)
   return <div className="bracket-modal-backdrop" onMouseDown={onClose}>
@@ -199,15 +201,16 @@ export function BracketDetails({ match, onClose }) {
       {hasRetour && (
         <div className="grid grid-cols-2 gap-3 mt-3 text-xs text-ink-600">
           <div className="detail-stat"><span>Aller</span><strong>{match.score1 ?? '—'} - {match.score2 ?? '—'}</strong></div>
-          <div className="detail-stat"><span>Retour</span><strong>{match.score1_retour ?? '—'} - {match.score2_retour ?? '—'}</strong></div>
+          <div className="detail-stat"><span>Retour</span><strong>{match.status === 'completed' ? `${match.score1_retour ?? '—'} - ${match.score2_retour ?? '—'}` : 'à venir'}</strong></div>
         </div>
       )}
       <div className="grid sm:grid-cols-2 gap-3 mt-5">
         <div className="detail-stat"><Crosshair size={16}/><span>Dégâts J1</span><strong>{Number(match.damage1 || 0) + Number(match.damage1_retour || 0)}</strong></div>
         <div className="detail-stat"><Crosshair size={16}/><span>Dégâts J2</span><strong>{Number(match.damage2 || 0) + Number(match.damage2_retour || 0)}</strong></div>
         <div className="detail-stat"><Zap size={16}/><span>Règle</span><strong>{match.match_type === 'onetap' ? 'One Tap · Headshot Only' : 'Spam · Bodyshot'}</strong></div>
-        <div className="detail-stat"><Clock3 size={16}/><span>État</span><strong>{match.status === 'completed' ? 'Terminé' : match.status === 'in_progress' ? 'En cours' : 'Programmé'}</strong></div>
-        <div className="detail-stat"><CalendarClock size={16}/><span>Horaire</span><strong>{match.scheduled_at ? new Date(match.scheduled_at).toLocaleString('fr-FR') : 'À confirmer'}</strong></div>
+        <div className="detail-stat"><Clock3 size={16}/><span>État</span><strong>{match.status === 'completed' ? 'Terminé' : match.status === 'aller_completed' ? 'Aller terminé — en attente du retour' : match.status === 'in_progress' ? 'En cours' : 'Programmé'}</strong></div>
+        <div className="detail-stat"><CalendarClock size={16}/><span>Aller</span><strong>{match.scheduled_at ? new Date(match.scheduled_at).toLocaleString('fr-FR') : 'À confirmer'}</strong></div>
+        <div className="detail-stat"><CalendarClock size={16}/><span>Retour</span><strong>{match.scheduled_at_retour ? new Date(match.scheduled_at_retour).toLocaleString('fr-FR') : 'À programmer'}</strong></div>
         <div className="detail-stat"><Shield size={16}/><span>Vainqueur</span><strong>{winner || 'À déterminer'}</strong></div>
       </div>
       <p className="text-xs text-ink-600 mt-5">Le vainqueur est déterminé par le cumul des kills aller + retour, et propagé automatiquement au tour suivant lors de la validation.</p>
